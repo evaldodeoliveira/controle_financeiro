@@ -1,0 +1,1 @@
+#internet, celular, stream
