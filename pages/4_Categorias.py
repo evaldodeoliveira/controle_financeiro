@@ -7,6 +7,7 @@
 
 import streamlit as st
 import inspect
+import numpy as np
 from controllers.category_controller import CategoryController
 
 st.set_page_config(
@@ -63,22 +64,19 @@ def create(config):
     col1, col2, col3 = st.columns(3)
     if col2.button("Incluir", use_container_width=True):            
         if name:
-            try:
-                config['controller'].add_category(config['type'], name, description)
+            # Chama o método add_category e verifica se ocorreu erro
+            result = config['controller'].add_category(config['type'], name, description)
+            
+            if result:  # Se result for True, significa que o processo foi bem-sucedido
+                print(result)
                 st.session_state['categories_updated'] = True  
                 st.session_state['categories_in_memorie'] = True          
                 st.rerun()                
-            except Exception as e:
-                st.error(f"Operação não realizada! \n\n Verifique se a categoria já existe!")                      
         else:
-            st.error('Campo "Nome" obrigatório!')
+            st.warning('Campo "Nome" obrigatório!')
 
 @st.dialog("Filtrar categoria")
 def read(config):    
-    categories = config['categories_df_renamed']['Nome'].unique()
-    category = st.multiselect("Categoria", categories, placeholder='')
-    mask = config['categories_df_renamed']['Nome'].str.contains('|'.join(category))
-    df_filtred = config['categories_df_renamed'][mask]
     #colocar um filtro config['type'] == produto,servico...
     #a ideia é mostra na aba de produto soment categoria de produstos e assim sucessivamente
     #lembrando no caso do F5?? defualt pode ser produtos
@@ -95,6 +93,10 @@ def read(config):
     #esta dando msg de sucesso ao tentar salvar categoria ja existente (unique)
     #
     #Erro ao clicar nos botões de editar e excluir quando o bd esta vazio
+    categories = config['categories_df_renamed']['Nome'].unique()
+    category = st.multiselect("Categoria", categories, placeholder='')
+    mask = config['categories_df_renamed']['Nome'].str.contains('|'.join(category))
+    df_filtred = config['categories_df_renamed'][mask]
     
     col1, col2, col3 = st.columns(3)
     if col2.button("Filtrar", use_container_width=True):
@@ -103,62 +105,93 @@ def read(config):
             st.session_state["df"] = df_filtred
             st.rerun()
         else:
-            st.error('Escolha ao menos uma categoria!')
+            st.warning('Escolha ao menos uma categoria!')
 
 @st.dialog("Excluir categoria")
-def delete(config):
-        #if not config['categories_df_renamed'].empty:
-        #    try:       
-                categories = config['categories_df_renamed']['Nome'].unique()
-                category = st.selectbox("Categoria", categories, placeholder='')
-                category_data = config['categories_df_renamed'][config['categories_df_renamed']['Nome'] == category].iloc[0]
-                st.text_input("Nome:", value=category_data["Nome"], disabled=True)
-                st.text_area("Descrição:", value=category_data["Descrição"], disabled=True) 
+def delete(config):       
+    categories = config['categories_df_renamed']['Nome'].unique()
+    categories = np.insert(categories, 0, "Selecione uma categoria")  # Adiciona a opção inicial
 
-                col1, col2, col3 = st.columns(3)
-                if col2.button("Excluir", use_container_width=True, type="primary"):            
-                    config['controller'].delete_category(category_data['cat_id'])
-                    st.session_state['categories_updated'] = True  
-                    st.session_state['categories_in_memorie'] = True          
-                    st.rerun()        
-        #    except Exception as e:
-        #        print("Erro ao acessar o dataframe", e)
-        #else:
-        #    pass
-            #st.write("Não há dados a serem exibidos!")  
+    category = st.selectbox("Categoria", categories, placeholder='', index=0)
 
+    # Verifica se o usuário selecionou "Selecione uma categoria"
+    if category == "Selecione uma categoria":
+        st.warning("Por favor, selecione uma categoria válida.")  # Exibe uma mensagem de aviso
+        return  # Interrompe a execução até que uma categoria válida seja selecionada
+    
+    category_data = config['categories_df_renamed'][config['categories_df_renamed']['Nome'] == category]
+    # Verifica se o filtro retornou algum dado
+    if category_data.empty:
+        st.error("Categoria não encontrada.")
+        return
+    
+    category_data = category_data.iloc[0]  # Obtém o primeiro resultado válido
+    
+    st.text_input("Nome:", value=category_data["Nome"], disabled=True)
+    st.text_area("Descrição:", value=category_data["Descrição"], disabled=True) 
 
-        #categories = config['categories_df_renamed']['Nome'].unique()
-        #category = st.selectbox("Categoria", categories)
-        #category_data = config['categories_df_renamed'][config['categories_df_renamed']['Nome'] == category].iloc[0]
-        #st.text_input("Nome:", value=category_data["Nome"], disabled=True)
-        #st.text_area("Descrição:", value=category_data["Descrição"], disabled=True)
-      
-        # col1, col2, col3 = st.columns(3)
-        # if col2.button("Excluir", use_container_width=True, type="primary"):            
-        #     config['controller'].delete_category(category_data['cat_id'])
-        #     st.session_state['categories_updated'] = True  
-        #     st.session_state['categories_in_memorie'] = True          
-        #     st.rerun()
-
+    col1, col2, col3 = st.columns(3)
+    if col2.button("Excluir", use_container_width=True, type="primary"): 
+        result = config['controller'].delete_category(category_data['cat_id'])            
+        if result:  # Se result for True, significa que o processo foi bem-sucedido
+            # Flags de atualização de sessão
+            st.session_state['categories_updated'] = True  
+            st.session_state['categories_in_memorie'] = True          
+            st.rerun()  # Recarrega a página para refletir as mudanças           
+        # config['controller'].delete_category(category_data['cat_id'])
+        # st.session_state['categories_updated'] = True  
+        # st.session_state['categories_in_memorie'] = True          
+        # st.rerun()        
+        
 @st.dialog("Alterar categoria")     
 def update(config):
+    # Recupera as categorias
     categories = config['categories_df_renamed']['Nome'].unique()
-    category = st.selectbox("Categoria", categories, placeholder='')
-    category_data = config['categories_df_renamed'][config['categories_df_renamed']['Nome'] == category].iloc[0]  
-   
+    categories = np.insert(categories, 0, "Selecione uma categoria")  # Adiciona a opção inicial
+
+    # Selectbox para seleção de categoria
+    category = st.selectbox("Categoria", categories, placeholder='', index=0)
+    
+    # Verifica se o usuário selecionou "Selecione uma categoria"
+    if category == "Selecione uma categoria":
+        st.warning("Por favor, selecione uma categoria válida.")  # Exibe uma mensagem de aviso
+        return  # Interrompe a execução até que uma categoria válida seja selecionada
+    
+    # Obtém os dados da categoria selecionada
+    category_data = config['categories_df_renamed'][config['categories_df_renamed']['Nome'] == category]
+    
+    # Verifica se o filtro retornou algum dado
+    if category_data.empty:
+        st.error("Categoria não encontrada.")
+        return
+
+    category_data = category_data.iloc[0]  # Obtém o primeiro resultado válido
+        
+    # Input de texto para o nome
     name = st.text_input("Nome:", value=category_data["Nome"])
+
+    # Text area para a descrição
     description = st.text_area("Descrição:", value=category_data["Descrição"])
-#criar mecanismo que force ao menos o campo name ser preenchido a fim de fiar com categoria vazia
+
+    # Colunas para os botões
     col1, col2, col3 = st.columns(3)
-    if col2.button("Alterar", use_container_width=True, type="primary"):          
-        config['controller'].update_category(category_data['cat_id'], name, description)
-        st.session_state['categories_updated'] = True  
-        st.session_state['categories_in_memorie'] = True          
-        st.rerun()
+    
+    if col2.button("Alterar", use_container_width=True, type="primary"):         
+        # Verifica se o campo foi apagado ou está vazio        
+        if not name:
+            st.warning("O campo nome não pode estar vazio. Por favor, preencha.")
+        else:            
+            # Atualiza a categoria            
+            result = config['controller'].update_category(category_data['cat_id'], config['type'], name, description)
+            
+            if result:  # Se result for True, significa que o processo foi bem-sucedido
+                # Flags de atualização de sessão
+                st.session_state['categories_updated'] = True  
+                st.session_state['categories_in_memorie'] = True          
+                st.rerun()  # Recarrega a página para refletir as mudanças
+
 
 def category_view():
-    print(f"Executing {inspect.currentframe().f_code.co_name}")
     columns = ["cat_id", "cat_type", "cat_name", "cat_description"]
     controller = CategoryController()
 

@@ -41,36 +41,52 @@ class DataRepository:
             st.error(f"Ocorreu um erro ao criar as tabelas: \n\n {e}")
 
     def load_categories(self):
-        print(f"Executing {inspect.currentframe().f_code.co_name}")
         """Carrega as categorias do banco de dados como DataFrame."""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 query = "SELECT * FROM category;"
                 return pd.read_sql_query(query, conn)
         except Exception as e:
-            st.error(f"Ocorreu um erro ao ler os dados: \n\n {e}") 
+            st.error(f"Ocorreu um erro ao ler os dados: \n\n {e}")
 
     def save_category(self, cat_type, cat_name, cat_description):
-        print(f"Executing {inspect.currentframe().f_code.co_name}")
         """Adiciona uma nova categoria ao banco de dados."""
-        #try:
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('INSERT INTO category (cat_type, cat_name, cat_description) VALUES (?, ?, ?)', (cat_type, cat_name, cat_description))
-            conn.commit()
-        #except Exception as e:
-        #    print(f"Ocorreu um erro ao inserir: {e}")
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('INSERT INTO category (cat_type, cat_name, cat_description) VALUES (?, ?, ?);', 
+                               (cat_type, cat_name, cat_description))
+                conn.commit()
+            return True  # Indica sucesso
+        except sqlite3.IntegrityError as e:            
+            if 'UNIQUE constraint failed' in str(e):
+                st.error(f"Erro: A categoria '{cat_name}' já existe para o tipo '{cat_type}'.")
+            else:
+                st.error(f"Erro de integridade: {e}")
+            return False  # Indica erro
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao salvar a categoria: {e}")
+            return False  # Indica erro
 
-    def update_category(self, category_id, new_name, new_description):
+    def update_category(self, category_id, cat_type, new_name, new_description):
         category_id = int(category_id)
         """Atualiza o nome de uma categoria no banco de dados."""
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute('UPDATE category SET cat_name = ?, cat_description = ? WHERE cat_id = ?', (new_name, new_description, category_id))
+                cursor.execute('UPDATE category SET cat_name = ?, cat_description = ? WHERE cat_id = ?;', (new_name, new_description, category_id))
                 conn.commit()
+            return True  # Indica sucesso
+        except sqlite3.IntegrityError as e:            
+            if 'UNIQUE constraint failed' in str(e):
+                st.error(f"Erro: A categoria '{new_name}' já existe para o tipo '{cat_type}'.")
+            else:
+                st.error(f"Erro de integridade: {e}")
+            return False  # Indica erro
         except Exception as e:
-            print(f"Ocorreu um erro ao atualizar os dados: {e}")
+            st.error(f"Ocorreu um erro ao atualizar os dados: \n\n {e}")
+            return False  # Indica erro
+
 
     def delete_category(self, category_id):
         category_id = int(category_id)
@@ -80,8 +96,13 @@ class DataRepository:
                 cursor = conn.cursor()
                 cursor.execute('DELETE FROM category WHERE cat_id = ?;', (category_id,))                
                 conn.commit()
+            return True  # Indica sucesso
+        except sqlite3.Error as e:            
+            st.error(f"Erro de integridade: {e}")
+            return False  # Indica erro
         except Exception as e:
-            print(f"Ocorreu um erro ao deletar: {e}")
+            st.error(f"Ocorreu um erro ao deletar: {e}")
+            return False  # Indica erro
         
 
     def load_products(self):
