@@ -1,17 +1,13 @@
 import pandas as pd
 import sqlite3
 import streamlit as st
-import inspect
-
 
 class DataRepository:
     def __init__(self, db_path='./data/financial_control.db'):
-        print(f"Executing {inspect.currentframe().f_code.co_name}")
         self.db_path = db_path
         self._initialize_database()
 
     def _initialize_database(self):
-        print(f"Executing {inspect.currentframe().f_code.co_name}")
         """Cria as tabelas no banco de dados, se elas não existirem."""
         try:
             with sqlite3.connect(self.db_path) as conn:

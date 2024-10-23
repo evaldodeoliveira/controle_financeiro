@@ -6,7 +6,6 @@
 #pagamnento (credito, debito..)
 
 import streamlit as st
-import inspect
 import numpy as np
 from controllers.category_controller import CategoryController
 
@@ -27,35 +26,29 @@ def menu(config):
    
     if not config['categories_df_renamed'].empty:
         try:
-            #Verificar a função deste "action"
-            #if "action" not in st.session_state:
-                if col1.button(f"Incluir categoria de {config['title']}", use_container_width=True):
-                    create(config)
-                if col2.button(f"Filtrar categoria de {config['title']}", use_container_width=True):
-                    read(config)
-                if col3.button(f"Editar categoria de {config['title']}", use_container_width=True):
-                    update(config)         
-                if col4.button(f"Excluir categoria de {config['title']}", use_container_width=True):
-                    delete(config) 
+            if col1.button(f"Incluir categoria de {config['title']}", use_container_width=True):
+                create(config)
+            if col2.button(f"Filtrar categoria de {config['title']}", use_container_width=True):
+                read(config)
+            if col3.button(f"Editar categoria de {config['title']}", use_container_width=True):
+                update(config)         
+            if col4.button(f"Excluir categoria de {config['title']}", use_container_width=True):
+                delete(config) 
         except Exception as e:
-            print("Erro ao acessar o dataframe", e)
+            st.error(f"Erro ao acessar o dataframe: {e}")
     else:
         try:
-            #Verificar a função deste "action"
-            #if "action" not in st.session_state:
-                if col1.button(f"Incluir categoria de {config['title']}", use_container_width=True):
-                    create(config)
-                if col2.button(f"Filtrar categoria de {config['title']}", use_container_width=True, disabled=True):
-                    read(config)
-                if col3.button(f"Editar categoria de {config['title']}", use_container_width=True, disabled=True):
-                    update(config)         
-                if col4.button(f"Excluir categoria de {config['title']}", use_container_width=True, disabled=True):
-                    delete(config) 
+            if col1.button(f"Incluir categoria de {config['title']}", use_container_width=True):
+                create(config)
+            if col2.button(f"Filtrar categoria de {config['title']}", use_container_width=True, disabled=True):
+                read(config)
+            if col3.button(f"Editar categoria de {config['title']}", use_container_width=True, disabled=True):
+                update(config)         
+            if col4.button(f"Excluir categoria de {config['title']}", use_container_width=True, disabled=True):
+                delete(config) 
         except Exception as e:
-            print("Erro ao acessar o dataframe", e)
-    
-    st.subheader(f"Categorias de {config['title']}s")
-    
+            st.error(f"Erro ao acessar o dataframe: {e}")   
+      
 @st.dialog("Cadastrar categoria")
 def create(config):
     name = st.text_input("Nome:")
@@ -68,41 +61,36 @@ def create(config):
             result = config['controller'].add_category(config['type'], name, description)
             
             if result:  # Se result for True, significa que o processo foi bem-sucedido
-                print(result)
-                st.session_state['categories_updated'] = True  
-                st.session_state['categories_in_memorie'] = True          
+                categories_updated = config['type'] + '_categories_updated'
+                st.session_state[categories_updated] = True
+                categories_in_memorie = config['type'] + '_categories_in_memorie'
+                st.session_state[categories_in_memorie] = True                               
                 st.rerun()                
         else:
             st.warning('Campo "Nome" obrigatório!')
 
 @st.dialog("Filtrar categoria")
-def read(config):    
-    #colocar um filtro config['type'] == produto,servico...
-    #a ideia é mostra na aba de produto soment categoria de produstos e assim sucessivamente
-    #lembrando no caso do F5?? defualt pode ser produtos
-    #validar abordagem de clausa de restrição no BD x flitro df
-
-    #Revisar abordagem de segmentar por tipo de categoria, pois remedio e plano são saude, por exemplo
-    #ou cria uma tabela de categori para cada um (categoria_produto, cat_servi, cat_invest...)
-    #ou tira o unique do nome da tabela categoria (vou tentar esta abordagem e usar o campo type para fltro)
-    #se tirar o unique tenho que garantir que o nome da categoria não possa se repetir para o mesmo tipo
-    #ex: prod(nome:cerveja, tipo: produto, nome: cerveja, tipo: produto)
-    #avaliar modelagem usando especilização:
-    #cat(nome, descrição, tipo_id), tipo(id,nome(unique)) não exatamente isto!!!
-
-    #esta dando msg de sucesso ao tentar salvar categoria ja existente (unique)
-    #
-    #Erro ao clicar nos botões de editar e excluir quando o bd esta vazio
+def read(config):   
     categories = config['categories_df_renamed']['Nome'].unique()
     category = st.multiselect("Categoria", categories, placeholder='')
-    mask = config['categories_df_renamed']['Nome'].str.contains('|'.join(category))
+
+    # Valor do tipo está fixo na variável config['type']
+    cat_type_selected = config['type']
+
+    # Aplica o filtro combinando o Nome selecionado e o tipo fixo
+    mask = (
+        config['categories_df_renamed']['Nome'].isin(category) &
+        (config['categories_df_renamed']['cat_type'] == cat_type_selected)
+    )
+    
     df_filtred = config['categories_df_renamed'][mask]
     
     col1, col2, col3 = st.columns(3)
-    if col2.button("Filtrar", use_container_width=True):
+    if col2.button("Filtrar", use_container_width=True):        
         if category:
-            st.session_state['categories_updated'] = True
-            st.session_state["df"] = df_filtred
+            categories_updated = config['type'] + '_categories_updated'
+            st.session_state[categories_updated] = True
+            st.session_state[config['type']] = df_filtred       
             st.rerun()
         else:
             st.warning('Escolha ao menos uma categoria!')
@@ -135,14 +123,12 @@ def delete(config):
         result = config['controller'].delete_category(category_data['cat_id'])            
         if result:  # Se result for True, significa que o processo foi bem-sucedido
             # Flags de atualização de sessão
-            st.session_state['categories_updated'] = True  
-            st.session_state['categories_in_memorie'] = True          
+            categories_updated = config['type'] + '_categories_updated'
+            st.session_state[categories_updated] = True
+            categories_in_memorie = config['type'] + '_categories_in_memorie'
+            st.session_state[categories_in_memorie] = True                     
             st.rerun()  # Recarrega a página para refletir as mudanças           
-        # config['controller'].delete_category(category_data['cat_id'])
-        # st.session_state['categories_updated'] = True  
-        # st.session_state['categories_in_memorie'] = True          
-        # st.rerun()        
-        
+
 @st.dialog("Alterar categoria")     
 def update(config):
     # Recupera as categorias
@@ -186,55 +172,123 @@ def update(config):
             
             if result:  # Se result for True, significa que o processo foi bem-sucedido
                 # Flags de atualização de sessão
-                st.session_state['categories_updated'] = True  
-                st.session_state['categories_in_memorie'] = True          
+                categories_updated = config['type'] + '_categories_updated'
+                st.session_state[categories_updated] = True
+                categories_in_memorie = config['type'] + '_categories_in_memorie'
+                st.session_state[categories_in_memorie] = True                
                 st.rerun()  # Recarrega a página para refletir as mudanças
 
-
-def category_view():
+def category_view():    
     columns = ["cat_id", "cat_type", "cat_name", "cat_description"]
     controller = CategoryController()
 
     # Listar Categorias
     categories_df = controller.get_categories()
+    
     try:
-        categories_df_renamed = categories_df[columns].rename(columns={"cat_name": "Nome", "cat_description": "Descrição"}).sort_index(ascending=False)
-
+        # Renomear e ordenar o DataFrame
+        categories_df_renamed = categories_df[columns].rename(
+            columns={"cat_name": "Nome", "cat_description": "Descrição"}
+        ).sort_index(ascending=False)
+       
+        # Criação das abas
         products, services = st.tabs(["Produtos", "Serviços"])
+       
+        # Aba de Produtos
         with products:
-            config = {'type': 'produto', 'title': 'produto', 'controller': controller, 'categories_df_renamed': categories_df_renamed}
-            menu(config)       
+            # Filtrar apenas os produtos
+            product_df = categories_df_renamed[categories_df_renamed['cat_type'] == 'produto']
+
+            # Configuração para produtos
+            config = {
+                'type': 'produto',
+                'title': 'produto',
+                'controller': controller,
+                'categories_df_renamed': product_df  # Somente produtos
+            }
+            menu(config)
+            st.subheader(f"Categorias de {config['title']}s")
+            #F5 and read() 
+            if 'produto' not in st.session_state:
+                st.session_state['produto'] = product_df
+
+            if 'produto_categories_updated' not in st.session_state:
+                st.session_state['produto_categories_updated'] = False
+            #dados carregados em tela atualmente
+            if st.session_state['produto_categories_updated']:        
+                st.success("Operação realizada com sucesso!")
+                st.session_state['produto_categories_updated'] = False        
+                if 'produto_categories_in_memorie' not in st.session_state:
+                    st.session_state['produto_categories_in_memorie'] = False
+                if st.session_state['produto_categories_in_memorie']:
+                    st.session_state['produto'] = config['categories_df_renamed']
+                    st.session_state['produto_categories_in_memorie'] = False
+            if st.session_state["produto"].empty:
+                st.write("Nenhum dado disponível.")
+            else:
+                st.dataframe(st.session_state['produto'], hide_index=True, use_container_width=True, column_config={"cat_id": None, "cat_type": None})
+                      
+        # Aba de Serviços
         with services:
-            #config = {'type': 'service', 'title': 'serviço'}
-            #menu(config)
-            pass
+            # Filtrar apenas os serviços
+            service_df = categories_df_renamed[categories_df_renamed['cat_type'] == 'serviço']        
+              
+            # Configuração para serviços
+            config = {
+                'type': 'serviço',
+                'title': 'serviço',
+                'controller': controller,
+                'categories_df_renamed': service_df  # Somente serviços
+            }
+            menu(config)
+            st.subheader(f"Categorias de {config['title']}s")
+             #F5 and read()
+            if 'serviço' not in st.session_state:
+                st.session_state['serviço'] = service_df
 
-        #F5   
-        if 'categories_updated' not in st.session_state:
-            st.session_state['categories_updated'] = False
-            st.session_state["df"] = categories_df_renamed     
-
-        #dados carregados em tela atualmente
-        if st.session_state['categories_updated']:        
-            st.success("Operação realizada com sucesso!")
-            st.session_state['categories_updated'] = False
-            
-            if 'categories_in_memorie' not in st.session_state:
-                st.session_state['categories_in_memorie'] = False
-
-            if st.session_state['categories_in_memorie']:
-                st.session_state["df"] = categories_df_renamed
-                st.session_state['categories_in_memorie'] = False
-        
-        if st.session_state["df"].empty:
-            st.write("Nenhum dado disponível.")
-        else:
-            st.dataframe(st.session_state["df"], hide_index=True, use_container_width=True, column_config={"cat_id": None, "cat_type": None})
-
-        if st.button("Reset"):        
-            st.session_state["df"] = categories_df_renamed
+            if 'serviço_categories_updated' not in st.session_state:
+                st.session_state['serviço_categories_updated'] = False                
+            #dados carregados em tela atualmente
+            if st.session_state['serviço_categories_updated']:        
+                st.success("Operação realizada com sucesso!")
+                st.session_state['serviço_categories_updated'] = False        
+                if 'serviço_categories_in_memorie' not in st.session_state:
+                    st.session_state['serviço_categories_in_memorie'] = False
+                if st.session_state['serviço_categories_in_memorie']:
+                    st.session_state['serviço'] = config['categories_df_renamed']
+                    st.session_state['serviço_categories_in_memorie'] = False
+            if st.session_state["serviço"].empty:
+                st.write("Nenhum dado disponível.")
+            else:
+                st.dataframe(st.session_state['serviço'], hide_index=True, use_container_width=True, column_config={"cat_id": None, "cat_type": None})
+ 
+        # Botão "Reset"
+        if st.button("Reset"):
+            st.session_state['produto'] = product_df        
+            st.session_state["serviço"] = service_df  # Atualiza o DataFrame mostrado na interface com o filtrado
             st.rerun() 
     except Exception as e:
         print(e)
 
 category_view()
+
+# #avaliar mecanismo para usar mesmo codigo para abas distintas
+# F5 and read() 
+#             if 'produto' not in st.session_state:
+#                 st.session_state['produto'] = product_df
+
+#             if 'produto_categories_updated' not in st.session_state:
+#                 st.session_state['produto_categories_updated'] = False
+#             dados carregados em tela atualmente
+#             if st.session_state['produto_categories_updated']:        
+#                 st.success("Operação realizada com sucesso!")
+#                 st.session_state['produto_categories_updated'] = False        
+#                 if 'produto_categories_in_memorie' not in st.session_state:
+#                     st.session_state['produto_categories_in_memorie'] = False
+#                 if st.session_state['produto_categories_in_memorie']:
+#                     st.session_state['produto'] = config['categories_df_renamed']
+#                     st.session_state['produto_categories_in_memorie'] = False
+#             if st.session_state["produto"].empty:
+#                 st.write("Nenhum dado disponível.")
+#             else:
+#                 st.dataframe(st.session_state['produto'], hide_index=True, use_container_width=True, column_config={"cat_id": None, "cat_type": None})
