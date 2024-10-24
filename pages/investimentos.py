@@ -1,1 +1,0 @@
-#ação, btc, fundos

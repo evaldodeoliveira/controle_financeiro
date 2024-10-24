@@ -15,7 +15,7 @@ class DataRepository:
                 sql_category = '''
                     CREATE TABLE IF NOT EXISTS category (
                         cat_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        cat_type TEXT NOT NULL CHECK (cat_type IN ('produto', 'serviço', 'investimento', 'receita', 'despesa')),
+                        cat_type TEXT NOT NULL CHECK (cat_type IN ('expense', 'income', 'investment')),
                         cat_name TEXT NOT NULL,
                         cat_description TEXT,
                         UNIQUE (cat_type, cat_name)
