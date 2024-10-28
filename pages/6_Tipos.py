@@ -5,7 +5,7 @@ from controllers.category_controller import CategoryController
 
 st.set_page_config(
     page_title="Tipos",
-   # page_icon=":material/type:",
+    page_icon=":material/merge_type:",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
@@ -55,8 +55,12 @@ def create(config):
     cat_type = config['categories_df_renamed']['cat_type']
     # Valida se o tipo a ser cadastrado tem despesa cadastrada
     if cat_type.ne(config['type']).all():
-        st.error("Cadastre a catagoria despesa!!!!")
-        st.write("colocar um botão e confirmação e redirecionar para tipos")
+        st.error(f'''
+                 Nenhuma categoria {config['title']} cadastrada.\n\n
+                 Você será redirecionado a página de Categorias.
+                 ''')
+        if st.button("Ok", use_container_width=True):
+            st.switch_page("pages/5_Categorias.py")
         return
     
     name = st.text_input("Nome:")
@@ -130,24 +134,30 @@ def type_view():
     # Listar Categorias
     categories_df = controller_cat.get_categories()
 
-    #   Validar se existe categoria cadastrada
+    #   Valida se existe categoria cadastrada
+
     if categories_df.empty:
-        st.error("Cadastre as categorias primeiramente!")
-        st.write("colocar um botãod e confirmação e redirecionar para categorias")
+        st.error('''
+                 Nenhuma categoria cadastrada.\n\n
+                 Você será redirecionado a página de Categorias.
+                 ''')
+        if st.button("Ok", use_container_width=True):
+            st.switch_page("pages/5_Categorias.py")
         return
-    
-    columns = ["type_id", "type_type", "type_name", "type_description"]
+
+    columns = ["type_id", "type_type", "type_name", "type_description", "cat_name"]
     controller = TypeController()
     # Listar tipos
     type_df = controller.get_types()
+
 #validar se tipos <> null concat com categoria
  
-    print("types_df", type_df, "\n\ncategories_df", categories_df)
+    print("types_df\n\n", type_df, "\n\ncategories_df\n\n", categories_df)
     
     try:
         # Renomear e ordenar o DataFrame
         types_df_renamed = type_df[columns].rename(
-            columns={"type_name": "Nome", "type_description": "Descrição"}
+            columns={"type_name": "Nome", "type_description": "Descrição", "cat_name": "Categoria"}
         ).sort_index(ascending=False)
 
         # Renomear e ordenar o DataFrame

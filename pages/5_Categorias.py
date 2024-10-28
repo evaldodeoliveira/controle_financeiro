@@ -119,7 +119,10 @@ def delete(config):
             categories_updated = config['type'] + '_categories_updated'
             st.session_state[categories_updated] = True
             categories_in_memorie = config['type'] + '_categories_in_memorie'
-            st.session_state[categories_in_memorie] = True                     
+            st.session_state[categories_in_memorie] = True    
+
+            st.session_state['expense_types_updated'] = True        
+            st.session_state['expense_types_in_memorie'] = True         
             st.rerun()  # Recarrega a página para refletir as mudanças           
 
 @st.dialog("Alterar categoria")     
