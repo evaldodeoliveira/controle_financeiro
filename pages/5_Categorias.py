@@ -1,5 +1,3 @@
-#investimentos: criptos, fundos imobiliários
-#
 import streamlit as st
 import numpy as np
 from controllers.category_controller import CategoryController
@@ -112,7 +110,7 @@ def delete(config):
     
     st.text_input("Nome:", value=category_data["Nome"], disabled=True)
     st.text_area("Descrição:", value=category_data["Descrição"], disabled=True) 
-
+#colocar mensagem de confirmação de exclusão e impactos
     col1, col2, col3 = st.columns(3)
     if col2.button("Excluir", use_container_width=True, type="primary"): 
         result = config['controller'].delete_category(category_data['cat_id'])            

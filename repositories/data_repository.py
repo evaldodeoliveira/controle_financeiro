@@ -22,16 +22,20 @@ class DataRepository:
                     );
                 '''
                 cursor.execute(sql_category)
+
+                sql_type = '''
+                    CREATE TABLE IF NOT EXISTS type (
+                        type_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        type_type TEXT NOT NULL CHECK (type_type IN ('expense', 'income', 'investment')),                        
+                        type_name TEXT NOT NULL,
+                        type_description TEXT,
+                        type_category_id INTEGER,
+                        FOREIGN KEY (type_category_id) REFERENCES category(cat_id) ON DELETE CASCADE,
+                        UNIQUE (type_type, type_category_id, type_name)
+                    );
+                '''
+                cursor.execute(sql_type)                
                 
-                # cursor.execute('''
-                #     CREATE TABLE IF NOT EXISTS products (
-                #         id INTEGER PRIMARY KEY AUTOINCREMENT,
-                #         name TEXT NOT NULL,
-                #         price REAL NOT NULL,
-                #         category_id INTEGER,
-                #         FOREIGN KEY (category_id) REFERENCES categories(id)
-                #     )
-                # ''')
                 conn.commit()
         except Exception as e:
             st.error(f"Ocorreu um erro ao criar as tabelas: \n\n {e}")
@@ -83,7 +87,6 @@ class DataRepository:
             st.error(f"Ocorreu um erro ao atualizar os dados: \n\n {e}")
             return False  # Indica erro
 
-
     def delete_category(self, category_id):
         category_id = int(category_id)
         """Deleta uma categoria do banco de dados."""
@@ -100,39 +103,31 @@ class DataRepository:
             st.error(f"Ocorreu um erro ao deletar: {e}")
             return False  # Indica erro
         
-
-    def load_products(self):
-        """Carrega os produtos do banco de dados como DataFrame."""
+    def load_types(self):
+        """Carrega os tipos do banco de dados como DataFrame."""
         with sqlite3.connect(self.db_path) as conn:
             query = """
-            SELECT products.id, products.name, products.price, categories.name as category_name
-            FROM products
-            LEFT JOIN categories ON products.category_id = categories.id
+            SELECT * FROM type t
+            JOIN category c ON t.type_category_id = c.cat_id;
             """
             return pd.read_sql_query(query, conn)
 
-    def save_product(self, name, price, category_id):
-        """Adiciona um novo produto ao banco de dados."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('INSERT INTO products (name, price, category_id) VALUES (?, ?, ?)', 
-                           (name, price, category_id))
-            conn.commit()
-
-    def update_product(self, product_id, name, price, category_id):
-        """Atualiza um produto no banco de dados."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                UPDATE products 
-                SET name = ?, price = ?, category_id = ? 
-                WHERE id = ?
-            ''', (name, price, category_id, product_id))
-            conn.commit()
-
-    def delete_product(self, product_id):
-        """Deleta um produto do banco de dados."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('DELETE FROM products WHERE id = ?', (product_id,))
-            conn.commit()
+    def save_type(self, type_type, type_name, type_description, type_category_id):
+        """Adiciona um novo tipo ao banco de dados."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('INSERT INTO type (type_type, type_name, type_description, type_category_id) VALUES (?, ?, ?, ?);', 
+                           (type_type, type_name, type_description, type_category_id))
+                conn.commit()
+            return True  # Indica sucesso
+        except sqlite3.IntegrityError as e:            
+            if 'UNIQUE constraint failed' in str(e):
+                st.error(f"Erro: O tipo '{type_name}' já existe para o tipo '{type_type}'.")
+            else:
+                st.error(f"Erro de integridade: {e}")
+            return False  # Indica erro
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao salvar o tipo: {e}")
+            return False  # Indica erro
+        
