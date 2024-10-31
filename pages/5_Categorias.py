@@ -110,20 +110,49 @@ def delete(config):
     
     st.text_input("Nome:", value=category_data["Nome"], disabled=True)
     st.text_area("Descrição:", value=category_data["Descrição"], disabled=True) 
-#colocar mensagem de confirmação de exclusão e impactos
-    col1, col2, col3 = st.columns(3)
-    if col2.button("Excluir", use_container_width=True, type="primary"): 
-        result = config['controller'].delete_category(category_data['cat_id'])            
-        if result:  # Se result for True, significa que o processo foi bem-sucedido
-            # Flags de atualização de sessão
-            categories_updated = config['type'] + '_categories_updated'
-            st.session_state[categories_updated] = True
-            categories_in_memorie = config['type'] + '_categories_in_memorie'
-            st.session_state[categories_in_memorie] = True    
+    
+    # Inicializar um estado para controle de confirmação, se ainda não existir
+    if "confirm_delete" not in st.session_state:
+        st.session_state.confirm_delete = False
 
-            st.session_state['expense_types_updated'] = True        
-            st.session_state['expense_types_in_memorie'] = True         
-            st.rerun()  # Recarrega a página para refletir as mudanças           
+    # Espaço vazio para exibir a mensagem de confirmação/cancelamento
+    message_placeholder = st.empty()
+
+    col1, col2, col3 = st.columns(3)
+    # Botão para iniciar a exclusão
+    if col2.button("Excluir", type="primary", use_container_width=True):
+        st.session_state.confirm_delete = True  # Ativar o estado de confirmação
+
+    # Verificar se o estado de confirmação está ativo
+    if st.session_state.confirm_delete:
+        # Mensagem de confirmação com opção para confirmar ou cancelar
+        st.warning(
+            f"⚠️ Ao excluir a categoria **{category_data['Nome']}**, "
+            "todos os tipos, despesas, receitas e investimentos vinculados a ela serão automaticamente excluídos!\n\n"
+            "Deseja realmente continuar?"
+        )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Sim, quero excluir", use_container_width=True):
+                st.session_state.confirm_delete = False  # Resetar o estado de confirmação
+                result = config['controller'].delete_category(category_data['cat_id'])            
+                if result:  # Se result for True, significa que o processo foi bem-sucedido
+                    #Flags de atualização de sessão
+                    categories_updated = config['type'] + '_categories_updated'
+                    st.session_state[categories_updated] = True
+                    categories_in_memorie = config['type'] + '_categories_in_memorie'
+                    st.session_state[categories_in_memorie] = True    
+
+                    category_deleted = config['type'] + '_category_deleted'
+                    st.session_state[category_deleted] = True       
+                    st.rerun()  # Recarrega a página para refletir as mudanças 
+        
+        with col2:
+            if st.button("Cancelar", use_container_width=True):
+                st.session_state.confirm_delete = False  # Resetar o estado de confirmação
+                st.rerun() 
 
 @st.dialog("Alterar categoria")     
 def update(config):

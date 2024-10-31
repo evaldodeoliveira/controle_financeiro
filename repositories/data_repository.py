@@ -60,7 +60,7 @@ class DataRepository:
             return True  # Indica sucesso
         except sqlite3.IntegrityError as e:            
             if 'UNIQUE constraint failed' in str(e):
-                st.error(f"Erro: A categoria '{cat_name}' já existe para o tipo '{cat_type}'.")
+                st.error(f"Erro: A categoria '{cat_name}' já existe.")
             else:
                 st.error(f"Erro de integridade: {e}")
             return False  # Indica erro
@@ -93,6 +93,7 @@ class DataRepository:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+                cursor.execute("PRAGMA foreign_keys = ON;")
                 cursor.execute('DELETE FROM category WHERE cat_id = ?;', (category_id,))                
                 conn.commit()
             return True  # Indica sucesso
@@ -105,12 +106,15 @@ class DataRepository:
         
     def load_types(self):
         """Carrega os tipos do banco de dados como DataFrame."""
-        with sqlite3.connect(self.db_path) as conn:
-            query = """
-            SELECT * FROM type t
-            JOIN category c ON t.type_category_id = c.cat_id;
-            """
-            return pd.read_sql_query(query, conn)
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                query = """
+                SELECT * FROM type t
+                JOIN category c ON t.type_category_id = c.cat_id;
+                """
+                return pd.read_sql_query(query, conn)
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao ler os dados: \n\n {e}")
 
     def save_type(self, type_type, type_name, type_description, type_category_id):
         """Adiciona um novo tipo ao banco de dados."""
@@ -123,7 +127,7 @@ class DataRepository:
             return True  # Indica sucesso
         except sqlite3.IntegrityError as e:            
             if 'UNIQUE constraint failed' in str(e):
-                st.error(f"Erro: O tipo '{type_name}' já existe para o tipo '{type_type}'.")
+                st.error(f"Erro: O tipo '{type_name}' já existe.")
             else:
                 st.error(f"Erro de integridade: {e}")
             return False  # Indica erro
