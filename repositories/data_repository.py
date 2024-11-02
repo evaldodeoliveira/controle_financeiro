@@ -134,20 +134,21 @@ class DataRepository:
         except Exception as e:
             st.error(f"Ocorreu um erro ao salvar o tipo: {e}")
             return False  # Indica erro
-#não tá dando erro de unicidade
+
     def update_type(self, type_id, type_type, new_name, new_description, type_category_id):
             type_id = int(type_id)
             type_category_id = int(type_category_id)
-            print(type_id, type_type, new_name, new_description, type_category_id)
             """Atualiza o tipo no banco de dados."""
             try:
                 with sqlite3.connect(self.db_path) as conn:
                     cursor = conn.cursor()
-                    cursor.execute('UPDATE type SET type_type = ?, type_name = ?, type_description = ?, type_category_id = ? WHERE type_id = ?;', 
-                                   (type_type, new_name, new_description, type_category_id, type_id))
+                    cursor.execute(
+                        'UPDATE type SET type_type = ?, type_name = ?, type_description = ?, type_category_id = ? WHERE type_id = ?;',
+                        (type_type, new_name, new_description, type_category_id, type_id)
+                    )
                     conn.commit()
                 return True  # Indica sucesso
-            except sqlite3.IntegrityError as e:            
+            except sqlite3.IntegrityError as e:                  
                 if 'UNIQUE constraint failed' in str(e):
                     st.error(f"Erro: O tipo '{new_name}' já existe.")
                 else:
