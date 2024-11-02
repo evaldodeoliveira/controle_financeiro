@@ -26,11 +26,9 @@ def menu(config):
             if col2.button(f"Filtrar tipo de {config['title']}", use_container_width=True):
                 read(config)
             if col3.button(f"Editar tipo de {config['title']}", use_container_width=True):
-                pass
-                #update(config)         
+                update(config)         
             if col4.button(f"Excluir tipo de {config['title']}", use_container_width=True):
-                pass
-                #delete(config) 
+                delete(config) 
         except Exception as e:
             st.error(f"Erro ao acessar o dataframe: {e}")
     else:
@@ -40,11 +38,9 @@ def menu(config):
             if col2.button(f"Filtrar tipo de {config['title']}", use_container_width=True, disabled=True):
                 read(config)
             if col3.button(f"Editar tipo de {config['title']}", use_container_width=True, disabled=True):
-                pass
-                #update(config)         
+                update(config)         
             if col4.button(f"Excluir tipo de {config['title']}", use_container_width=True, disabled=True):
-                pass
-                #delete(config) 
+                delete(config) 
         except Exception as e:
             st.error(f"Erro ao acessar o dataframe: {e}") 
 
@@ -123,6 +119,143 @@ def read(config):
         else:
             st.warning('Escolha ao menos um tipo e/ou categoria!')
 
+@st.dialog("Alterar categoria")     
+def update(config):
+    # Recupera as categorias
+    types = config['types_df_renamed']['Nome'].unique()
+    type = np.insert(types, 0, "Selecione o tipo")  # Adiciona a opção inicial
+
+    # Selectbox para seleção de tipo
+    type = st.selectbox("Tipo", type, placeholder='', index=0)
+    
+    # Verifica se o usuário selecionou "Selecione o tipo"
+    if type == "Selecione o tipo":
+        st.warning("Por favor, selecione um tipo válido.")  # Exibe uma mensagem de aviso
+        return  # Interrompe a execução até que um tipo válido seja selecionado
+    
+    # Obtém os dados do tipo selecionado
+    type_data = config['types_df_renamed'][config['types_df_renamed']['Nome'] == type]
+    
+    # Verifica se o filtro retornou algum dado
+    if type_data.empty:
+        st.error("Tipo não encontrado.")
+        return
+
+    type_data = type_data.iloc[0]  # Obtém o primeiro resultado válido
+        
+    name = st.text_input("Nome:", value=type_data["Nome"])
+    description = st.text_area("Descrição:", value=type_data["Descrição"])
+    #category = st.text_input("Categoria:", value=type_data["Categoria"]) 
+
+     # Recupera as categorias
+    categories = config['categories_df_renamed']['Nome'].unique()
+    #categories = np.insert(categories, 0, "Selecione uma categoria")  # Adiciona a opção inicial
+    categories = np.insert(categories, 0, type_data["Categoria"])  # Adiciona a opção inicial
+
+
+    # Selectbox para seleção de categoria
+    category = st.selectbox("Categoria", categories, placeholder='', index=0)
+    
+    # Verifica se o usuário selecionou "Selecione uma categoria"
+    if category == "Selecione uma categoria":
+        st.warning("Por favor, selecione uma categoria válida.")  # Exibe uma mensagem de aviso
+        return  # Interrompe a execução até que uma categoria válida seja selecionada
+
+    # Obtém os dados da categoria selecionada
+    category_data = config['categories_df_renamed'][config['categories_df_renamed']['Nome'] == category]
+    
+    # Verifica se o filtro retornou algum dado
+    if category_data.empty:
+        st.error("Categoria não encontrada.")
+        return
+
+    category_data = category_data.iloc[0]
+    # Colunas para os botões
+    col1, col2, col3 = st.columns(3)
+    
+    if col2.button("Alterar", use_container_width=True, type="primary"):         
+        # Verifica se o campo foi apagado ou está vazio        
+        if not name:
+            st.warning("O campo nome não pode estar vazio. Por favor, preencha.")
+        else:            
+            # Atualiza a categoria            
+            result = config['controller'].update_type(type_data['type_id'], type_data['type_type'], name, description, category_data['cat_id'])
+            
+            if result:  # Se result for True, significa que o processo foi bem-sucedido
+                # Flags de atualização de sessão
+                types_updated = config['type'] + '_types_updated'
+                st.session_state[types_updated] = True
+                types_in_memorie = config['type'] + '_types_in_memorie'
+                st.session_state[types_in_memorie] = True                
+                st.rerun()  # Recarrega a página para refletir as mudanças
+
+@st.dialog("Excluir tipo")
+def delete(config):   
+    types = config['types_df_renamed']['Nome'].unique()
+    types = np.insert(types, 0, "Selecione um tipo")  # Adiciona a opção inicial
+
+    type = st.selectbox("Tipo", types, placeholder='', index=0)
+
+    # Verifica se o usuário selecionou "Selecione um tipo"
+    if type == "Selecione um tipo":
+        st.warning("Por favor, selecione uma categoria válida.")  # Exibe uma mensagem de aviso
+        return  # Interrompe a execução até que uma categoria válida seja selecionada
+    
+    type_data = config['types_df_renamed'][config['types_df_renamed']['Nome'] == type]
+    # Verifica se o filtro retornou algum dado
+    if type_data.empty:
+        st.error("Tipo não encontrado.")
+        return
+    
+    type_data = type_data.iloc[0]  # Obtém o primeiro resultado válido
+    
+    st.text_input("Nome:", value=type_data["Nome"], disabled=True)
+    st.text_area("Descrição:", value=type_data["Descrição"], disabled=True) 
+    st.text_input("Categoria:", value=type_data["Categoria"], disabled=True) 
+
+    
+    # Inicializar um estado para controle de confirmação, se ainda não existir
+    if "confirm_delete_type" not in st.session_state:
+        st.session_state.confirm_delete_type = False
+
+    # Espaço vazio para exibir a mensagem de confirmação/cancelamento
+    #message_placeholder = st.empty()
+
+    col1, col2, col3 = st.columns(3)
+    # Botão para iniciar a exclusão
+    if col2.button("Excluir", type="primary", use_container_width=True):
+        st.session_state.confirm_delete_type = True  # Ativar o estado de confirmação
+
+    # Verificar se o estado de confirmação está ativo
+    if st.session_state.confirm_delete_type:
+        # Mensagem de confirmação com opção para confirmar ou cancelar
+        st.warning(
+            f"⚠️ Ao excluir o tipo **{type_data['Nome']}**, "
+            "todas despesas, receitas e investimentos vinculados a ele serão automaticamente excluídos!\n\n"
+            "Deseja realmente continuar?"
+        )
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Sim, quero excluir", use_container_width=True):
+                st.session_state.confirm_delete_type = False  # Resetar o estado de confirmação
+                result = config['controller'].delete_type(type_data['type_id'])            
+                if result:  # Se result for True, significa que o processo foi bem-sucedido
+                    #Flags de atualização de sessão
+                    types_updated = config['type'] + '_types_updated'
+                    st.session_state[types_updated] = True
+                    types_in_memorie = config['type'] + '_types_in_memorie'
+                    st.session_state[types_in_memorie] = True    
+
+                    type_deleted = config['type'] + '_type_deleted'
+                    st.session_state[type_deleted] = True       
+                    st.rerun()  # Recarrega a página para refletir as mudanças 
+        
+        with col2:
+            if st.button("Cancelar", use_container_width=True):
+                st.session_state.confirm_delete_type = False  # Resetar o estado de confirmação
+                st.rerun() 
 
 def type_view():
     columns_cat = ["cat_id", "cat_type", "cat_name", "cat_description"]
