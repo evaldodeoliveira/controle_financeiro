@@ -17,32 +17,32 @@ st.sidebar.markdown("Desenvolvido por [Evaldo](https://www.linkedin.com/in/evald
 
 
 def menu(config):
-    col1, col2, col3, col4 = st.columns(4)
-   
-    if not config['types_df_renamed'].empty:
-        try:
-            if col1.button(f"Incluir tipo de {config['title']}", use_container_width=True):
-                create(config)
-            if col2.button(f"Filtrar tipo de {config['title']}", use_container_width=True):
-                read(config)
-            if col3.button(f"Editar tipo de {config['title']}", use_container_width=True):
-                update(config)         
-            if col4.button(f"Excluir tipo de {config['title']}", use_container_width=True):
-                delete(config) 
-        except Exception as e:
-            st.error(f"Erro ao acessar o dataframe: {e}")
-    else:
-        try:
-            if col1.button(f"Incluir tipo de {config['title']}", use_container_width=True):
-                create(config)
-            if col2.button(f"Filtrar tipo de {config['title']}", use_container_width=True, disabled=True):
-                read(config)
-            if col3.button(f"Editar tipo de {config['title']}", use_container_width=True, disabled=True):
-                update(config)         
-            if col4.button(f"Excluir tipo de {config['title']}", use_container_width=True, disabled=True):
-                delete(config) 
-        except Exception as e:
-            st.error(f"Erro ao acessar o dataframe: {e}") 
+        col1, col2, col3, col4 = st.columns(4)
+    
+        if not config['types_df_renamed'].empty:
+            try:
+                if col1.button(f"Incluir tipo de {config['title']}", use_container_width=True):
+                    create(config)
+                if col2.button(f"Filtrar tipo de {config['title']}", use_container_width=True):
+                    read(config)
+                if col3.button(f"Alterar tipo de {config['title']}", use_container_width=True):
+                    update(config)         
+                if col4.button(f"Excluir tipo de {config['title']}", use_container_width=True):
+                    delete(config) 
+            except Exception as e:
+                st.error(f"Erro ao acessar o dataframe: {e}")
+        else:
+            try:
+                if col1.button(f"Incluir tipo de {config['title']}", use_container_width=True):
+                    create(config)
+                if col2.button(f"Filtrar tipo de {config['title']}", use_container_width=True, disabled=True):
+                    read(config)
+                if col3.button(f"Alterar tipo de {config['title']}", use_container_width=True, disabled=True):
+                    update(config)         
+                if col4.button(f"Excluir tipo de {config['title']}", use_container_width=True, disabled=True):
+                    delete(config) 
+            except Exception as e:
+                st.error(f"Erro ao acessar o dataframe: {e}") 
 
 @st.dialog("Cadastrar tipo")
 def create(config):
@@ -259,9 +259,9 @@ def delete(config):
 def type_view():
     columns_cat = ["cat_id", "cat_type", "cat_name", "cat_description"]
     controller_cat = CategoryController()
+    #revisar todo o código a fim de possivel melhoria de desempanho usando session state carreagdo em outras paginas
     # Listar Categorias
     categories_df = controller_cat.get_categories()
-    print(categories_df['cat_type'].values)
 
     #   Valida se existe categoria cadastrada
     if categories_df.empty:
@@ -269,7 +269,7 @@ def type_view():
                  Nenhuma categoria cadastrada.\n\n
                  Você será redirecionado a página de Categorias.
                  ''')
-        if st.button("Ok", use_container_width=True):
+        if st.button("Ok", use_container_width=True, key='categories'):
             st.switch_page("pages/5_Categorias.py")
         return
 
@@ -291,138 +291,197 @@ def type_view():
        
         # Criação das abas
         expenses, incomes, investments = st.tabs(["Despesas", "Receitas", "Investimentos"])
-       
         # Aba de Despesas
         with expenses:
-            if 'expense' not in categories_df['cat_type'].values:
+            #if 'expense' not in categories_df['cat_type'].values:
+            if 'cat_type' in categories_df.columns and 'expense' not in categories_df['cat_type'].values:
                 st.info(f'''
-                        Nenhuma categoria de Despesa cadastrada.\n\n
+                        Nenhuma categoria de ***Despesa*** cadastrada.\n\n
                         Clique no botão abaixo para cadastrar ou siga para as abas Receitas ou Investimentos!
                         ''')
-                if st.button("Ok", use_container_width=True):
-                    st.switch_page("pages/5_Categorias.py")
-                return
-
-            # Filtrar apenas os tipos depesas
-            expense_df = types_df_renamed[types_df_renamed['type_type'] == 'expense']
-
-            # Filtrar apenas os depesas
-            expense_cat_df = categories_df_renamed[categories_df_renamed['cat_type'] == 'expense']
-            
-            # Configuração para despesa
-            config = {
-                'type': 'expense',
-                'title': 'despesa',
-                'controller': controller,
-                'types_df_renamed': expense_df,  # Somente tipos despesas
-                'categories_df_renamed': expense_cat_df
-            }
-
-            menu(config)
-            st.subheader(f"Tipos de {config['title']}s")
-            #F5 and read() 
-            if 'expense_type' not in st.session_state:
-                st.session_state['expense_type'] = expense_df
-
-            if 'expense_types_updated' not in st.session_state:
-                st.session_state['expense_types_updated'] = False
-
-            if 'expense_category_deleted' not in st.session_state:
-                #st.session_state['expense_type'] = config['types_df_renamed']
-                st.session_state['expense_category_deleted'] = False
-            
-            if st.session_state['expense_category_deleted']:
-                st.session_state['expense_type'] = expense_df
-                st.session_state['expense_category_deleted'] = False
-
-            #dados carregados em tela atualmente
-            if st.session_state['expense_types_updated']: 
-                st.success("Operação realizada com sucesso!")
-                st.session_state['expense_types_updated'] = False        
-                if 'expense_types_in_memorie' not in st.session_state:
-                    st.session_state['expense_types_in_memorie'] = False
-                if st.session_state['expense_types_in_memorie']:
-                    st.session_state['expense_type'] = config['types_df_renamed']
-                    st.session_state['expense_types_in_memorie'] = False
-            if st.session_state["expense_type"].empty:
-                st.write("Nenhum dado disponível.")
+                
+                with st.form(key='expense_form', border=False):
+                    submit_button = st.form_submit_button(label="Ok", use_container_width=True)
+                    if submit_button:                        
+                        #st.session_state['redirect_to_tab'] = 'expenses'  # ou 'expenses' ou 'investments'
+                        st.switch_page("pages/5_Categorias.py")               
             else:
-                st.dataframe(st.session_state['expense_type'], hide_index=True, use_container_width=True, column_config={"type_id": None, "type_type": None})
+                # Filtrar apenas os tipos depesas
+                expense_df = types_df_renamed[types_df_renamed['type_type'] == 'expense']
+
+                # Filtrar apenas os depesas
+                expense_cat_df = categories_df_renamed[categories_df_renamed['cat_type'] == 'expense']
+                
+                # Configuração para despesa
+                config = {
+                    'type': 'expense',
+                    'title': 'despesa',
+                    'controller': controller,
+                    'types_df_renamed': expense_df,  # Somente tipos despesas
+                    'categories_df_renamed': expense_cat_df
+                }
+
+                menu(config)
+                st.subheader(f"Tipos de {config['title']}s")
+                #F5 and read() 
+                if 'expense_type' not in st.session_state:
+                    st.session_state['expense_type'] = expense_df
+
+                if 'expense_types_updated' not in st.session_state:
+                    st.session_state['expense_types_updated'] = False
+
+                if 'expense_category_deleted' not in st.session_state:
+                    #st.session_state['expense_type'] = config['types_df_renamed']
+                    st.session_state['expense_category_deleted'] = False
+                
+                if st.session_state['expense_category_deleted']:
+                    st.session_state['expense_type'] = expense_df
+                    st.session_state['expense_category_deleted'] = False
+
+                #dados carregados em tela atualmente
+                if st.session_state['expense_types_updated']: 
+                    st.success("Operação realizada com sucesso!")
+                    st.session_state['expense_types_updated'] = False        
+                    if 'expense_types_in_memorie' not in st.session_state:
+                        st.session_state['expense_types_in_memorie'] = False
+                    if st.session_state['expense_types_in_memorie']:
+                        st.session_state['expense_type'] = config['types_df_renamed']
+                        st.session_state['expense_types_in_memorie'] = False
+                if st.session_state["expense_type"].empty:
+                    st.write("Nenhum dado disponível.")
+                else:
+                    st.dataframe(st.session_state['expense_type'], hide_index=True, use_container_width=True, column_config={"type_id": None, "type_type": None})
+                
+                 # Botão "Reset"
+                if st.button("Recarregar", use_container_width=True, key='btn_expense'):
+                    st.session_state['expense_type'] = expense_df        
+                    st.rerun()
                       
         with incomes:
-            if 'income' not in categories_df['cat_type'].values:
+            if 'cat_type' in categories_df.columns and 'income' not in categories_df['cat_type'].values:
                 st.info(f'''
-                        Nenhuma categoria de Receita cadastrada.\n\n
+                        Nenhuma categoria de ***Receita*** cadastrada.\n\n
                         Clique no botão abaixo para cadastrar ou siga para as abas Despesas ou Investimentos!
                         ''')
-                if st.button("Ok", use_container_width=True):
-                    st.switch_page("pages/5_Categorias.py")
-                return
-            
-            # Filtrar apenas os tipos depesas
-            income_df = types_df_renamed[types_df_renamed['type_type'] == 'income']
-
-            # Filtrar apenas os depesas
-            income_cat_df = categories_df_renamed[categories_df_renamed['cat_type'] == 'income']
-            
-            # Configuração para receitas
-            config = {
-                'type': 'income',
-                'title': 'receita',
-                'controller': controller,
-                'types_df_renamed': income_df,  # Somente tipos receitas
-                'categories_df_renamed': income_cat_df
-            }
-
-            menu(config)
-            st.subheader(f"Tipos de {config['title']}s")
-            #F5 and read() 
-            if 'income_type' not in st.session_state:
-                st.session_state['income_type'] = income_df
-
-            if 'income_types_updated' not in st.session_state:
-                st.session_state['income_types_updated'] = False
-
-            if 'income_category_deleted' not in st.session_state:
-                #st.session_state['expense_type'] = config['types_df_renamed']
-                st.session_state['income_category_deleted'] = False
-            
-            if st.session_state['income_category_deleted']:
-                st.session_state['income_type'] = income_df
-                st.session_state['income_category_deleted'] = False
-
-            #dados carregados em tela atualmente
-            if st.session_state['income_types_updated']: 
-                st.success("Operação realizada com sucesso!")
-                st.session_state['income_types_updated'] = False        
-                if 'income_types_in_memorie' not in st.session_state:
-                    st.session_state['income_types_in_memorie'] = False
-                if st.session_state['income_types_in_memorie']:
-                    st.session_state['income_type'] = config['types_df_renamed']
-                    st.session_state['income_types_in_memorie'] = False
-            if st.session_state["income_type"].empty:
-                st.write("Nenhum dado disponível.")
+                with st.form(key='income_form', border=False):
+                    submit_button = st.form_submit_button(label="Ok", use_container_width=True)
+                    if submit_button:
+                        #st.session_state['redirect_to_tab'] = 'incomes'  # ou 'expenses' ou 'investments'
+                        st.switch_page("pages/5_Categorias.py")          
             else:
-                st.dataframe(st.session_state['income_type'], hide_index=True, use_container_width=True, column_config={"type_id": None, "type_type": None})
+                # Filtrar apenas os tipos depesas
+                income_df = types_df_renamed[types_df_renamed['type_type'] == 'income']
+
+                # Filtrar apenas os depesas
+                income_cat_df = categories_df_renamed[categories_df_renamed['cat_type'] == 'income']
+                
+                # Configuração para receitas
+                config = {
+                    'type': 'income',
+                    'title': 'receita',
+                    'controller': controller,
+                    'types_df_renamed': income_df,  # Somente tipos receitas
+                    'categories_df_renamed': income_cat_df
+                }
+
+                menu(config)
+                st.subheader(f"Tipos de {config['title']}s")
+                #F5 and read() 
+                if 'income_type' not in st.session_state:
+                    st.session_state['income_type'] = income_df
+
+                if 'income_types_updated' not in st.session_state:
+                    st.session_state['income_types_updated'] = False
+
+                if 'income_category_deleted' not in st.session_state:
+                    #st.session_state['expense_type'] = config['types_df_renamed']
+                    st.session_state['income_category_deleted'] = False
+                
+                if st.session_state['income_category_deleted']:
+                    st.session_state['income_type'] = income_df
+                    st.session_state['income_category_deleted'] = False
+
+                #dados carregados em tela atualmente
+                if st.session_state['income_types_updated']: 
+                    st.success("Operação realizada com sucesso!")
+                    st.session_state['income_types_updated'] = False        
+                    if 'income_types_in_memorie' not in st.session_state:
+                        st.session_state['income_types_in_memorie'] = False
+                    if st.session_state['income_types_in_memorie']:
+                        st.session_state['income_type'] = config['types_df_renamed']
+                        st.session_state['income_types_in_memorie'] = False
+                if st.session_state["income_type"].empty:
+                    st.write("Nenhum dado disponível.")
+                else:
+                    st.dataframe(st.session_state['income_type'], hide_index=True, use_container_width=True, column_config={"type_id": None, "type_type": None})
+
+                 # Botão "Reset"
+                if st.button("Recarregar", use_container_width=True, key='btn_income'):
+                    st.session_state["income_type"] = income_df  # Atualiza o DataFrame mostrado na interface com o filtrado
+                    st.rerun()
     
         with investments:
-            # print('Invetimentos', categories_df['cat_type'].values)
-            # if 'investment' not in categories_df['cat_type'].values:
-            #     st.info(f'''
-            #             Nenhuma categoria de Investimento cadastrada.\n\n
-            #             Clique no botão abaixo para cadastrar ou siga para as abas Despesas ou Receitas!
-            #             ''')
-            #     if st.button("Ok", use_container_width=True):
-            #         st.switch_page("pages/5_Categorias.py")
-            #     return
-            pass
+            if 'cat_type' in categories_df.columns and 'investment' not in categories_df['cat_type'].values:
+                st.info(f'''
+                        Nenhuma categoria de ***Investimento*** cadastrada.\n\n
+                        Clique no botão abaixo para cadastrar ou siga para as abas Receitas ou Despesas!
+                        ''')
+                with st.form(key='investment_form', border=False):
+                    submit_button = st.form_submit_button(label="Ok", use_container_width=True)
+                    if submit_button:
+                        #st.session_state['redirect_to_tab'] = 'investments'  # ou 'expenses' ou 'investments'
+                        st.switch_page("pages/5_Categorias.py")              
+            else:
+                # Filtrar apenas os tipos investimentos
+                investment_df = types_df_renamed[types_df_renamed['type_type'] == 'investment']
 
-        # Botão "Reset"
-        if st.button("Recarregar", use_container_width=True):
-            st.session_state['expense_type'] = expense_df        
-            st.session_state["income_type"] = income_df  # Atualiza o DataFrame mostrado na interface com o filtrado
-            # st.session_state["investment"] = investment_df
-            st.rerun() 
+                # Filtrar apenas os investimentos
+                investment_cat_df = categories_df_renamed[categories_df_renamed['cat_type'] == 'investment']
+                
+                # Configuração para investimentos
+                config = {
+                    'type': 'investment',
+                    'title': 'investimento',
+                    'controller': controller,
+                    'types_df_renamed': investment_df,  # Somente tipos investimentos
+                    'categories_df_renamed': investment_cat_df
+                }
+
+                menu(config)
+                st.subheader(f"Tipos de {config['title']}s")
+                #F5 and read() 
+                if 'investment_type' not in st.session_state:
+                    st.session_state['investment_type'] = investment_df
+
+                if 'investment_types_updated' not in st.session_state:
+                    st.session_state['investment_types_updated'] = False
+
+                if 'investment_category_deleted' not in st.session_state:
+                    #st.session_state['expense_type'] = config['types_df_renamed']
+                    st.session_state['investment_category_deleted'] = False
+                
+                if st.session_state['investment_category_deleted']:
+                    st.session_state['investment_type'] = investment_df
+                    st.session_state['investment_category_deleted'] = False
+
+                #dados carregados em tela atualmente
+                if st.session_state['investment_types_updated']: 
+                    st.success("Operação realizada com sucesso!")
+                    st.session_state['investment_types_updated'] = False        
+                    if 'investment_types_in_memorie' not in st.session_state:
+                        st.session_state['investment_types_in_memorie'] = False
+                    if st.session_state['investment_types_in_memorie']:
+                        st.session_state['investment_type'] = config['types_df_renamed']
+                        st.session_state['investment_types_in_memorie'] = False
+                if st.session_state["investment_type"].empty:
+                    st.write("Nenhum dado disponível.")
+                else:
+                    st.dataframe(st.session_state['investment_type'], hide_index=True, use_container_width=True, column_config={"type_id": None, "type_type": None})
+                
+                    # Botão "Reset"
+                if st.button("Recarregar", use_container_width=True, key='btn_investment'):
+                    st.session_state["investment_type"] = investment_df
+                    st.rerun()
     except Exception as e:
         print(e)
 
