@@ -288,19 +288,9 @@ class DataRepository:
                     return pd.read_sql_query(query, conn)
             except Exception as e:
                 st.error(f"Ocorreu um erro ao ler os dados: \n\n {e}")
-    # Dentro da classe DataRepository
 
     def save_expense(self, expense: Expense):
         """Salva uma nova despesa no banco de dados."""
-        print(
-            type(expense.exp_date), expense.exp_date,
-            type(expense.exp_value), expense.exp_value,
-            type(expense.exp_description), expense.exp_description,
-            type(expense.exp_type_id), expense.exp_type_id,
-            type(expense.exp_pay_id), expense.exp_pay_id,
-            type(expense.exp_number_of_installments), expense.exp_number_of_installments,
-            type(expense.exp_installment_value), expense.exp_installment_value
-        )
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -320,21 +310,46 @@ class DataRepository:
                     float(expense.exp_installment_value)
                 ))
                 conn.commit()
-            return True  # Indica sucesso
+            return True
         except Exception as e:
             st.error(f"Ocorreu um erro ao salvar a despesa: {e}")
-            return False  # Indica erro
+            return False
 
-#usar abordagem de Objeto
-# def save_expense(self, expense: Expense) -> None:
-#         """Adiciona uma nova despesa ao banco de dados."""
-#         try:
-#             with sqlite3.connect(self.db_path) as conn:
-#                 cursor = conn.cursor()
-#                 cursor.execute('''
-#                     INSERT INTO expense (exp_date, exp_value, exp_description, exp_type_id, exp_pay_id, exp_number_of_installments, exp_installment_value)
-#                     VALUES (?, ?, ?, ?, ?, ?, ?)
-#                 ''', (expense.date, expense.value, expense.description, expense.type_id, expense.pay_id, expense.number_of_installments, expense.installment_value))
-#                 conn.commit()
-#         except Exception as e:
-#             print(f"Ocorreu um erro ao adicionar a despesa: {e}")
+    def update_expense(self, expense: Expense):
+        print(expense)
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                UPDATE expense
+                SET exp_date = ?, exp_value = ?, exp_description = ?, 
+                    exp_type_id = ?, exp_pay_id = ?, 
+                    exp_number_of_installments = ?, exp_installment_value = ?
+                WHERE exp_id = ?;
+            ''', (
+                str(expense.exp_date),                      # exp_date
+                float(expense.exp_value),                   # exp_value
+                str(expense.exp_description),               # exp_description
+                int(expense.exp_type_id),                   # exp_type_id
+                int(expense.exp_pay_id),                    # exp_pay_id
+                int(expense.exp_number_of_installments),    # exp_number_of_installments
+                float(expense.exp_installment_value),       # exp_installment_value
+                int(expense.exp_id)                         # exp_id
+            ))
+                conn.commit()
+            return True
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao atualizar os dados: \n\n {e}")
+            return False
+        
+    def delete_expense(self, exp_id):
+        exp_id = int(exp_id)
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('DELETE FROM expense WHERE exp_id = ?;', (exp_id,))                
+                conn.commit()
+            return True 
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao deletar: {e}")
+            return False

@@ -1,5 +1,20 @@
+quando aplicamo sum filtro e saimos da tela, ao voltar o filtro continua aplicado, verificar se faz sentido trazer todos os dados toda vez que entra na tela
+quando fizer updaet faz sentido trazer o df filtrado(tipo read) ou todo como esta hoje
+
+
 Alterar tabela de tipo para ao exluiro o tipo excluir despesas, receitas, investimentos
 
+Melhoria na Nomenclatura:
+
+Para maior clareza, você pode usar nomes mais descritivos para suas funções, especialmente nos controllers. Por exemplo, save_type poderia ser renomeado para add_type, e load_categories poderia ser fetch_categories.
+Documentação:
+
+Adicionar docstrings mais detalhadas às suas classes e métodos ajudará outros desenvolvedores (ou você mesmo no futuro) a entender rapidamente o que cada parte do código faz.
+Testes:
+
+Considere implementar testes automatizados (unitários e funcionais) para garantir que a lógica do seu aplicativo esteja correta e que as alterações não quebrem funcionalidades existentes.
+
+melhorar validações (despesas)
 
 Investimentos:
 

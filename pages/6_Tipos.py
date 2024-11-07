@@ -119,9 +119,9 @@ def read(config):
         else:
             st.warning('Escolha ao menos um tipo e/ou categoria!')
 
-@st.dialog("Alterar categoria")     
+@st.dialog("Alterar tipo")     
 def update(config):
-    # Recupera as categorias
+    # Recupera os tipos
     types = config['types_df_renamed']['Nome'].unique()
     type_selected = np.insert(types, 0, "Selecione o tipo")  # Adiciona a opção inicial
 
@@ -152,22 +152,20 @@ def update(config):
     #categories = np.insert(categories, 0, "Selecione uma categoria")  # Adiciona a opção inicial
     categories = np.insert(categories, 0, type_data["Categoria"])  # Adiciona a opção inicial
 
-
     # Selectbox para seleção de categoria
     category = st.selectbox("Categoria", categories, placeholder='', index=0)
-    
-    # Verifica se o usuário selecionou "Selecione uma categoria"
-    if category == "Selecione uma categoria":
-        st.warning("Por favor, selecione uma categoria válida.")  # Exibe uma mensagem de aviso
-        return  # Interrompe a execução até que uma categoria válida seja selecionada
+
+    # if category == "Selecione uma categoria":
+    #     st.warning("Por favor, selecione uma categoria válida.")
+    #     return 
 
     # Obtém os dados da categoria selecionada
     category_data = config['categories_df_renamed'][config['categories_df_renamed']['Nome'] == category]
     
-    # Verifica se o filtro retornou algum dado
-    if category_data.empty:
-        st.error("Categoria não encontrada.")
-        return
+    # # Verifica se o filtro retornou algum dado
+    # if category_data.empty:
+    #     st.error("Categoria não encontrada.")
+    #     return
 
     category_data = category_data.iloc[0]
     # Colunas para os botões
