@@ -1,12 +1,11 @@
 import streamlit as st
+from controllers.category_controller import CategoryController
 from controllers.type_controller import TypeController
 from controllers.expense_controller import ExpenseController
 from controllers.payment_controller import PaymentController
 from models.expense import Expense
 import numpy as np
 from datetime import datetime
-#import pandas as pd
-
 
 st.set_page_config(
     page_title="Despesas",
@@ -47,21 +46,13 @@ def float_to_brazilian_currency(value):
     """
     return f"R$ {value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-
 @st.dialog("Cadastrar despesa", width="large")
 def create(config):
     col1, col2, col3 = st.columns(3)
 
-    # types = config['types_df']['type_name'].unique()
-    # types = np.insert(types, 0, "Selecione um tipo")    
-    # type_selected = col1.selectbox("Tipo:",types, placeholder='', index=0)
-    # if type_selected == "Selecione um tipo":
-    #     st.warning("Por favor, selecione um tipo válido.")
-    #     return
-    types = config['types_df']['type_name'].unique()
+    types = sorted(config['types_df']['type_name'].unique())
     type_selected = col1.selectbox("Tipo:",types)
     date = col2.date_input("Data:", format="DD/MM/YYYY")
-    #value = col3.number_input("Valor:", min_value=0.00)
     # Campo de input como texto
     value = col3.text_input("Valor:", value="R$ 0,00")
     # Convertendo o input para float e validando
@@ -76,16 +67,9 @@ def create(config):
     
     col1, col2, col3 = st.columns(3)
 
-    # payments = config['payments_df']['pay_name'].unique()
-    # payments = np.insert(types, 0, "Selecione um pagamento") 
-    # payment = col1.selectbox("Pagamento:", payments, placeholder='', index=0)
-    # if payment == "Selecione um pagamento":
-    #     st.warning("Por favor, selecione um pagamento válido.")
-    #     return
-    payments = config['payments_df']['pay_name'].unique()
+    payments = sorted(config['payments_df']['pay_name'].unique())
     payment_selected = col1.selectbox("Pagamento:", payments)
     number_of_installments = col2.number_input("Quantidade de parcelas:", min_value=0)
-    #installments_value = col3.number_input("Valor da parcela:", min_value=0.00)
     installments_value = col3.text_input("Valor da parcela:", value="R$ 0,00")
     # Convertendo o input para float e validando
     installments_value = format_to_float(installments_value)
@@ -123,7 +107,7 @@ def create(config):
 def read(config):
     #implementar filtros por:
     #data, tipo de pagamento, tipo de despesa, range de valor...
-    expenses = config['expenses_df_renamed']['Descrição'].unique()
+    expenses = sorted(config['expenses_df_renamed']['Descrição'].unique())
     expense = st.multiselect("Despesa", expenses, placeholder='')
 
     mask = (
@@ -134,7 +118,6 @@ def read(config):
     col1, col2, col3 = st.columns(3)
     if col2.button("Filtrar", use_container_width=True):        
         if expense:
-#vai conflitar com Category.py view
             st.session_state['expense_updated'] = True
             st.session_state['expense'] = df_filtred       
             st.rerun()
@@ -143,7 +126,7 @@ def read(config):
 
 @st.dialog("Alterar despesa", width="large")     
 def update(config):
-    expenses = config['expenses_df_renamed']['Descrição'].unique()
+    expenses = sorted(config['expenses_df_renamed']['Descrição'].unique())
     expense_selected = np.insert(expenses, 0, "Selecione a despesa")
     expense_selected = st.selectbox("Despesa", expense_selected, placeholder='', index=0)
     if expense_selected == "Selecione a despesa":
@@ -165,8 +148,6 @@ def update(config):
     date_obj = datetime.strptime(expense_data['Data'], "%Y-%m-%d").date()
     date_obj = col2.date_input("Data:", value=date_obj, format="DD/MM/YYYY")
 
-    # value_formated = float_to_brazilian_currency(expense_data['Valor'])
-    # print(value_formated)
     value = format_to_float(col3.text_input("Valor:",expense_data['Valor']))
     if value is None:
         return
@@ -181,7 +162,6 @@ def update(config):
 
     number_of_installments = col2.number_input("Quantidade de parcelas:",expense_data['Quantidade de parcelas'])
     installments_value = format_to_float(col3.text_input("Valor da parcela:",expense_data['Valor da parcela']))
-    #installments_value = col3.number_input("Valor da parcela:",expense_data['Valor da parcela'])
     if installments_value is None:
         return
 
@@ -207,10 +187,9 @@ def update(config):
         else:
             st.warning('Campo "Descrição" obrigatório!')
 
-
 @st.dialog("Excluir despesa", width="large")     
 def delete(config):
-    expenses = config['expenses_df_renamed']['Descrição'].unique()
+    expenses = sorted(config['expenses_df_renamed']['Descrição'].unique())
     expense_selected = np.insert(expenses, 0, "Selecione a despesa")
     expense_selected = st.selectbox("Despesa", expense_selected, placeholder='', index=0)
     if expense_selected == "Selecione a despesa":
@@ -258,10 +237,7 @@ def delete(config):
                 result = config['controller'].delete_expense(expense_data['exp_id'])            
                 if result:
                     st.session_state['expense_updated'] = True
-                    st.session_state['expense_in_memorie'] = True   
-
-                    # type_deleted = config['type'] + '_type_deleted'
-                    # st.session_state[type_deleted] = True       
+                    st.session_state['expense_in_memorie'] = True        
                     st.rerun()
         
         with col2:
@@ -270,30 +246,48 @@ def delete(config):
                 st.rerun() 
 
 def view_expense():
-    #testar se categorias cadastradas
+    controller_cat = CategoryController()
+    categories_df = controller_cat.get_categories()
+    #   Valida se existe categoria de despesa cadastrada
+    if categories_df.empty or not (categories_df['cat_type'] == 'expense').any():
+        st.info('''
+                 Nenhuma ***categoria*** cadastrada.\n\n
+                 Clique no botão abaixo para ser redirecionado a página de ***Categorias***.
+                 ''')
+        with st.form(key='expense_category_form', border=False):
+            submit_button = st.form_submit_button(label="Ok", use_container_width=True)
+            if submit_button:                        
+                st.switch_page("pages/5_Categorias.py")   
+            return 
+        
     controller_type = TypeController()
     types_df = controller_type.get_types()
+    #filtrar apenas por Despesas
+    types_df = types_df[types_df['type_type'] == 'expense']
 
     if types_df.empty:
         st.info('''
-                 Nenhum tipo cadastrado.\n\n
-                 Você será redirecionado a página de Tipos.
+                 Nenhum ***tipo*** cadastrado.\n\n
+                 Clique no botão abaixo para ser redirecionado a página ***Tipos***.
                  ''')
-        if st.button("Ok", use_container_width=True, key='expense'):
-            st.switch_page("pages/6_Tipos.py")
-        return
+        with st.form(key='expense_type_form', border=False):
+            submit_button = st.form_submit_button(label="Ok", use_container_width=True)
+            if submit_button:                        
+                st.switch_page("pages/6_Tipos.py")
+            return
     
     controller_pay = PaymentController()
     payments_df = controller_pay.get_payments()
-
     if payments_df.empty:
         st.info('''
-                 Nenhum pagamento cadastrado.\n\n
-                 Você será redirecionado a página de Pagamento.
+                 Nenhum ***pagamento*** cadastrado.\n\n
+                 Clique no botão abaixo para ser redirecionado a página ***Pagamentos***.
                  ''')
-        if st.button("Ok", use_container_width=True, key='expense'):
-            st.switch_page("pages/Pagamentos.py")
-        return
+        with st.form(key='expense_payment_form', border=False):
+            submit_button = st.form_submit_button(label="Ok", use_container_width=True)
+            if submit_button:                        
+                st.switch_page("pages/7_Pagamentos.py")
+            return   
 
     columns = ["exp_id","exp_date", "exp_value","exp_description", "type_name", "pay_name", "exp_number_of_installments", "exp_installment_value"]
     controller = ExpenseController()
@@ -311,15 +305,12 @@ def view_expense():
                 "exp_number_of_installments": "Quantidade de parcelas",
                 "exp_installment_value": "Valor da parcela"
                 }
-        ).sort_index(ascending=False)
+        ).sort_values(by="Data", ascending=False)
         st.subheader("Despesas")
 
         # Aplicando a formatação nas colunas 'Valor' e 'Valor da parcela'
         expenses_df_renamed['Valor'] = expenses_df_renamed['Valor'].apply(float_to_brazilian_currency)
         expenses_df_renamed['Valor da parcela'] = expenses_df_renamed['Valor da parcela'].apply(float_to_brazilian_currency)
-        #expenses_df_renamed['Valor'] = expenses_df_renamed['Valor'].apply(lambda x: f'R$ {x:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'))
-        #expenses_df_renamed['Valor da parcela'] = expenses_df_renamed['Valor da parcela'].apply(lambda x: f'R$ {x:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'))
-        
 
         config = {
                 'controller': controller,
@@ -358,18 +349,30 @@ def view_expense():
             st.session_state['expense'] = expenses_df_renamed
 
         if 'expense_updated' not in st.session_state:
-            st.session_state['expense_updated'] = False 
+            st.session_state['expense_updated'] = False
 
-        if 'expense_category_deleted' not in st.session_state:
-            #st.session_state['expense_type'] = config['types_df_renamed']
-            st.session_state['expense_category_deleted'] = False
-#esta conflitando com outras tela como Tipo
-# preciso tratar este controle de session para atuar igualmente em todas as telas que possuem interdependencias      
-# interdepndente (categoria, tipo e pagamento)          
-        if st.session_state['expense_category_deleted']:
+        #Atualiza a tela se Categoria foi excluída ou alterada
+        if 'page_expense_category_updated' not in st.session_state:
+            st.session_state['page_expense_category_updated'] = False
+        if st.session_state['page_expense_category_updated']:
             st.session_state['expense'] = expenses_df_renamed
-            st.session_state['expense_category_deleted'] = False
+            st.session_state['page_expense_category_updated'] = False
 
+        #Atualiza a tela se Tipo foi excluído ou alterado
+        if 'page_expense_type_updated' not in st.session_state:
+            st.session_state['page_expense_type_updated'] = False
+        if st.session_state['page_expense_type_updated']:
+            st.session_state['expense'] = expenses_df_renamed
+            st.session_state['page_expense_type_updated'] = False
+        
+        #Atualiza tela se Pagamento foi excluído ou alterado
+        if 'page_expense_payment_updated' not in st.session_state:
+            st.session_state['page_expense_payment_updated'] = False
+        if st.session_state['page_expense_payment_updated']:
+            st.session_state['expense'] = expenses_df_renamed
+            st.session_state['page_expense_payment_updated'] = False
+
+        #Atualiza a tela se Despesa foi inserida, alterada ou excluida
         if st.session_state['expense_updated']:        
             st.success("Operação realizada com sucesso!")
             st.session_state['expense_updated'] = False        

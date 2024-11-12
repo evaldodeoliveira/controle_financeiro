@@ -283,7 +283,8 @@ class DataRepository:
                     query = """
                     SELECT * FROM expense e
                     JOIN type t ON e.exp_type_id = t.type_id
-                    JOIN payment p ON e.exp_pay_id = p.pay_id;
+                    JOIN payment p ON e.exp_pay_id = p.pay_id
+                    ORDER BY exp_date DESC;
                     """
                     return pd.read_sql_query(query, conn)
             except Exception as e:
@@ -316,7 +317,6 @@ class DataRepository:
             return False
 
     def update_expense(self, expense: Expense):
-        print(expense)
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()

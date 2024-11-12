@@ -1,8 +1,12 @@
-quando aplicamo sum filtro e saimos da tela, ao voltar o filtro continua aplicado, verificar se faz sentido trazer todos os dados toda vez que entra na tela
-quando fizer updaet faz sentido trazer o df filtrado(tipo read) ou todo como esta hoje
+
+limpar código
+read despesas
+
+ao cadastrar despesas com mesmo nome, quando vou buscar pata alterar só mostra o último registrado (unique).
+Ex: se cadastrar Alimentação no dia 9/11 e Alimentação no dia 10/11 só consigo alterar o do dia 10/11
 
 
-Alterar tabela de tipo para ao exluiro o tipo excluir despesas, receitas, investimentos
+
 
 Melhoria na Nomenclatura:
 

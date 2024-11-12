@@ -82,6 +82,7 @@ def update(config):
             result = config['controller'].update_payment(payment_data['pay_id'], name, description)
             
             if result:
+                st.session_state['expense_payment_updated'] = True #usado tela Despesas
                 st.session_state['payment_updated'] = True
                 st.session_state['payment_in_memorie'] = True                
                 st.rerun()
@@ -110,15 +111,11 @@ def delete(config):
     if "confirm_delete_payment" not in st.session_state:
         st.session_state.confirm_delete_payment = False
 
-    # Espaço vazio para exibir a mensagem de confirmação/cancelamento
-    #message_placeholder = st.empty()
-
     col1, col2, col3 = st.columns(3)
     if col2.button("Excluir", type="primary", use_container_width=True):
         st.session_state.confirm_delete_payment = True
 
     if st.session_state.confirm_delete_payment:
-        # Mensagem de confirmação com opção para confirmar ou cancelar
         st.warning(
             f"⚠️ Ao excluir o pagamento **{payment_data['Nome']}**, "
             "todos as despesas vinculadas a ele serão automaticamente excluídas!\n\n"
@@ -131,11 +128,10 @@ def delete(config):
             if st.button("Sim, quero excluir", use_container_width=True):
                 st.session_state.confirm_delete = False 
                 result = config['controller'].delete_payment(payment_data['pay_id'])            
-                if result:                     
+                if result:
+                    st.session_state['expense_payment_deleted'] = True #Page Despesas                        
                     st.session_state['payment_updated'] = True
-                    st.session_state['payment_in_memorie'] = True    
-#usar na tela de despesas???
-                    st.session_state['payment_deleted'] = True       
+                    st.session_state['payment_in_memorie'] = True        
                     st.rerun() 
         
         with col2:
@@ -152,7 +148,7 @@ def payment_view():
     try:
         payments_df_renamed = payments_df[columns].rename(
             columns={"pay_name": "Nome", "pay_description": "Descrição"}
-        ).sort_index(ascending=False)
+        ).sort_values(by="Nome")
         st.subheader("Pagamentos")
 
         config = {
@@ -184,7 +180,7 @@ def payment_view():
                     delete(config) 
             except Exception as e:
                 st.error(f"Erro ao acessar o dataframe: {e}")   
-        
+
         #F5 and read()
         if 'payment' not in st.session_state:
             st.session_state['payment'] = payments_df_renamed
@@ -194,7 +190,8 @@ def payment_view():
 
         if st.session_state['payment_updated']:        
             st.success("Operação realizada com sucesso!")
-            st.session_state['payment_updated'] = False        
+            st.session_state['payment_updated'] = False
+            st.session_state['page_expense_payment_updated'] = True #Controle de atualização na tela de Despesas       
             if 'payment_in_memorie' not in st.session_state:
                 st.session_state['payment_in_memorie'] = False
             if st.session_state['payment_in_memorie']:
