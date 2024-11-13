@@ -58,7 +58,7 @@ def update(config):
     payment = st.selectbox("Pagamento", payments, placeholder='', index=0)
     
     if payment == "Selecione um pagamento":
-        st.warning("Por favor, selecione um pagamento válida.")
+        st.warning("Por favor, selecione um pagamento válido.")
         return
     
     payment_data = config['payments_df_renamed'][config['payments_df_renamed']['Nome'] == payment]

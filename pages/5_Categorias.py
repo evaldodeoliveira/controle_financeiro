@@ -94,7 +94,7 @@ def read(config):
 
 @st.dialog("Excluir categoria")
 def delete(config):       
-    categories = sorted(config['categories_df_renamed']['Nome'].unique())
+    categories = config['categories_df_renamed']['Nome'].unique()
     categories = np.insert(categories, 0, "Selecione uma categoria")  # Adiciona a opção inicial
 
     category = st.selectbox("Categoria", categories, placeholder='', index=0)
@@ -165,7 +165,7 @@ def delete(config):
 @st.dialog("Alterar categoria")     
 def update(config):
     # Recupera as categorias
-    categories = sorted(config['categories_df_renamed']['Nome'].unique())
+    categories = config['categories_df_renamed']['Nome'].unique()
     categories = np.insert(categories, 0, "Selecione uma categoria")  # Adiciona a opção inicial
 
     # Selectbox para seleção de categoria

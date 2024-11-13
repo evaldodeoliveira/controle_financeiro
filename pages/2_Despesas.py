@@ -126,9 +126,9 @@ def read(config):
 
 @st.dialog("Alterar despesa", width="large")     
 def update(config):
-    expenses = sorted(config['expenses_df_renamed']['Descrição'].unique())
-    expense_selected = np.insert(expenses, 0, "Selecione a despesa")
-    expense_selected = st.selectbox("Despesa", expense_selected, placeholder='', index=0)
+    expenses = np.sort(config['expenses_df_renamed']['Descrição'].unique())
+    expenses = np.insert(expenses, 0, "Selecione a despesa")
+    expense_selected = st.selectbox("Despesa", expenses, placeholder='', index=0)
     if expense_selected == "Selecione a despesa":
         st.warning("Por favor, selecione uma despesa válida.")
         return
@@ -139,7 +139,7 @@ def update(config):
     expense_data = expense_data.iloc[0]
         
     col1, col2, col3 = st.columns(3)
-    types = config['types_df']['type_name'].unique()
+    types = np.sort(config['types_df']['type_name'].unique())
     types = np.insert(types, 0, expense_data["Tipo"])
     type_selected = col1.selectbox("Tipo:", types, placeholder='', index=0)
     type_data = config['types_df'][config['types_df']['type_name'] == type_selected]
@@ -154,7 +154,7 @@ def update(config):
 
     col1, col2, col3 = st.columns(3)
 
-    payments = config['payments_df']['pay_name'].unique()
+    payments = np.sort(config['payments_df']['pay_name'].unique())
     payments = np.insert(payments, 0, expense_data["Pagamento"])
     payment = col1.selectbox("Pagamento", payments, placeholder='', index=0)
     payment_data = config['payments_df'][config['payments_df']['pay_name'] == payment]
@@ -189,9 +189,12 @@ def update(config):
 
 @st.dialog("Excluir despesa", width="large")     
 def delete(config):
-    expenses = sorted(config['expenses_df_renamed']['Descrição'].unique())
-    expense_selected = np.insert(expenses, 0, "Selecione a despesa")
-    expense_selected = st.selectbox("Despesa", expense_selected, placeholder='', index=0)
+    expenses = np.sort(config['expenses_df_renamed']['Descrição'].unique())
+    expenses = np.insert(expenses, 0, "Selecione a despesa")
+    expense_selected = st.selectbox("Despesa", expenses, placeholder='', index=0)
+    # expense_selected = np.insert(expenses, 0, "Selecionea despesa")
+    # expense_selected = st.selectbox("Despesa", expense_selected, placeholder='', index=0)
+    
     if expense_selected == "Selecione a despesa":
         st.warning("Por favor, selecione uma despesa válida.")
         return
