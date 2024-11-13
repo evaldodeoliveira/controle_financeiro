@@ -10,6 +10,17 @@ from datetime import timedelta
 import warnings
 warnings.simplefilter("ignore", category=FutureWarning)
 
+import locale
+# import plotly.io as pio
+
+# Define o locale para português
+locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')  # Para Linux
+#locale.setlocale(locale.LC_TIME, 'pt_BR')      # Para Windows, caso o anterior não funcione
+
+# Configurando o Plotly para exibir os meses em português
+#pio.templates.default = "plotly_dark"  # Opcional: define um tema escuro para o gráfico
+
+
 # st.set_page_config(
 #     page_title="Dashboard",
 #     page_icon=":material/dashboard:",
@@ -195,9 +206,11 @@ df_expense_final['Data'] = pd.to_datetime(df_expense_final['Data'])
 
 # Filtros de Data
 st.title("Dashboard de Despesas")
-st.sidebar.header("Filtros")
-data_inicio = st.sidebar.date_input("Data Início", df_expense_final['Data'].min())
-data_fim = st.sidebar.date_input("Data Fim", df_expense_final['Data'].max())
+#st.sidebar.header("Filtros")
+#data_inicio = st.sidebar.date_input("Data Início", df_expense_final['Data'].min())
+#data_fim = st.sidebar.date_input("Data Fim", df_expense_final['Data'].max())
+data_inicio = st.date_input("Data Início", df_expense_final['Data'].min(), format="DD/MM/YYYY")
+data_fim = st.date_input("Data Fim", df_expense_final['Data'].max(), format="DD/MM/YYYY")
 
 # Criando uma cópia do DataFrame filtrado
 df_filtrado = df_expense_final[(df_expense_final['Data'] >= pd.to_datetime(data_inicio)) & 
@@ -261,28 +274,63 @@ else:
         x=0.5, y=0.5, text="Não há parcelas a vencer", showarrow=False,
         font=dict(size=20, color="red"), align="center"
     )
+    # 5. Gráfico de Distribuição de Despesas por Período
+# Adicionando coluna de mês ao DataFrame filtrado com formato de string para o eixo X
+df_filtrado['Mes'] = df_filtrado['Data'].dt.to_period('M').astype(str)
 
-# 5. Gráfico de Distribuição de Despesas por Período
-# Criando uma coluna 'Mes' e agrupando as despesas por mês
-df_filtrado['Mes'] = df_filtrado['Data'].dt.to_period('M')
+# Agrupando por 'Mes' e somando os valores
 despesas_mensal = df_filtrado.groupby('Mes')['Valor'].sum().reset_index()
 
-# Convertendo o Period para datetime
-despesas_mensal['Mes'] = despesas_mensal['Mes'].dt.to_timestamp()
+# Convertendo a coluna 'Mes' de volta para datetime para uma visualização correta no gráfico
+despesas_mensal['Mes'] = pd.to_datetime(despesas_mensal['Mes'], format='%Y-%m')
 
-# Adicionando os meses ausentes com valor zero
-#Não funcionou!!!
-
-# Cria uma linha do tempo completa entre o início e o fim do período filtrado
-todos_meses = pd.date_range(start=despesas_mensal['Mes'].min(), end=despesas_mensal['Mes'].max(), freq='MS')
-print(todos_meses)
-despesas_mensal = despesas_mensal.set_index('Mes').reindex(todos_meses, fill_value=0).reset_index()
-print(despesas_mensal)
-despesas_mensal.columns = ['Mes', 'Valor']  # Renomeando as colunas após o reindex
-
-# Criando o gráfico de barras
+# Gerando o gráfico de barras
 fig_despesas_mensal = px.bar(despesas_mensal, x='Mes', y='Valor', title='Distribuição Mensal das Despesas')
-print(fig_despesas_mensal)
+
+# Formatando o eixo X para exibir apenas o mês e o ano uma vez (exemplo: "Nov 2024")
+fig_despesas_mensal.update_xaxes(
+    tickformat="%b %Y",  # Formato de exibição do mês e ano
+    dtick="M1"           # Configura a exibição para cada mês (sem duplicações)
+)
+
+# # 5. Gráfico de Distribuição de Despesas por Período
+# # Adicionando coluna de mês ao DataFrame filtrado com formato de string para o eixo X
+# df_filtrado['Mes'] = df_filtrado['Data'].dt.to_period('M').astype(str)
+
+# # Agrupando por 'Mes' e somando os valores
+# despesas_mensal = df_filtrado.groupby('Mes')['Valor'].sum().reset_index()
+
+# # Convertendo a coluna 'Mes' de volta para datetime para uma visualização correta no gráfico
+# despesas_mensal['Mes'] = pd.to_datetime(despesas_mensal['Mes'], format='%Y-%m')
+
+# # Gerando o gráfico de barras
+# fig_despesas_mensal = px.bar(despesas_mensal, x='Mes', y='Valor', title='Distribuição Mensal das Despesas')
+
+# # Formatando o eixo X para exibir o mês e o ano (exemplo: "Nov 2024")
+# fig_despesas_mensal.update_xaxes(tickformat="%b %Y")
+
+# # 5. Gráfico de Distribuição de Despesas por Período
+# # Criando uma coluna 'Mes' e agrupando as despesas por mês
+# df_filtrado['Mes'] = df_filtrado['Data'].dt.to_period('M')
+# despesas_mensal = df_filtrado.groupby('Mes')['Valor'].sum().reset_index()
+
+# # Convertendo o Period para datetime
+# despesas_mensal['Mes'] = despesas_mensal['Mes'].dt.to_timestamp()
+# print(despesas_mensal['Mes'].max())
+
+# # Adicionando os meses ausentes com valor zero
+# #Não funcionou!!!
+
+# # Cria uma linha do tempo completa entre o início e o fim do período filtrado
+# todos_meses = pd.date_range(start=despesas_mensal['Mes'].min(), end=despesas_mensal['Mes'].max(), freq='MS')
+# print(todos_meses)
+# despesas_mensal = despesas_mensal.set_index('Mes').reindex(todos_meses, fill_value=0).reset_index()
+# print(despesas_mensal)
+# despesas_mensal.columns = ['Mes', 'Valor']  # Renomeando as colunas após o reindex
+
+# # Criando o gráfico de barras
+# fig_despesas_mensal = px.bar(despesas_mensal, x='Mes', y='Valor', title='Distribuição Mensal das Despesas')
+
 
 
 # Organização em colunas e exibição dos gráficos

@@ -2,6 +2,11 @@
 limpar código
 read despesas
 
+Dash
+formar valor monetário das barras para BRL
+colocar código dentro do try except
+colocar gráficos despesa, investimento, receita... em abas
+
 ao cadastrar despesas com mesmo nome, quando vou buscar pata alterar só mostra o último registrado (unique).
 Ex: se cadastrar Alimentação no dia 9/11 e Alimentação no dia 10/11 só consigo alterar o do dia 10/11
 
