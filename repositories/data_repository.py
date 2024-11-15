@@ -57,12 +57,40 @@ class DataRepository:
                         exp_type_id INTEGER,
                         exp_pay_id INTEGER,
                         exp_number_of_installments INTEGER DEFAULT 0,
-                        exp_installment_value REAL DEFAULT 0.0,
+                        exp_final_date_of_installment DATE, -- Data final do parcelamento
+                        exp_value_total_installment REAL NOT NULL,  -- Usando REAL para armazenar valores monetários
+                        exp_is_installment BOOLEAN DEFAULT 0,  -- Booleano indicando se é parcelado (1) ou à vista (0)
                         FOREIGN KEY (exp_type_id) REFERENCES type(type_id) ON DELETE CASCADE,
                         FOREIGN KEY (exp_pay_id) REFERENCES payment(pay_id) ON DELETE CASCADE
                     );
                 '''
                 cursor.execute(sql_expense)
+
+                sql_income = '''
+                    CREATE TABLE IF NOT EXISTS income (
+                        inc_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        inc_date DATE NOT NULL, -- Data da receita
+                        inc_value REAL NOT NULL, -- Valor da receita
+                        inc_description TEXT NOT NULL, -- Descrição da receita
+                        inc_type_id INTEGER, -- Relaciona ao tipo de receita
+                        FOREIGN KEY (inc_type_id) REFERENCES type(type_id) ON DELETE CASCADE
+                    );
+                '''
+                cursor.execute(sql_income)
+
+                sql_investment = '''
+                    CREATE TABLE IF NOT EXISTS investment (
+                        inv_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        inv_date DATE NOT NULL, -- Data do investimento
+                        inv_value REAL NOT NULL, -- Valor investido
+                        inv_description TEXT NOT NULL, -- Descrição do investimento
+                        inv_type_id INTEGER, -- Tipo de investimento (ex: ações, renda fixa)
+                        inv_return_rate REAL DEFAULT 0.0, -- Taxa de retorno (se aplicável)
+                        inv_maturity_date DATE, -- Data de vencimento/resgate (se aplicável)
+                        FOREIGN KEY (inv_type_id) REFERENCES type(type_id) ON DELETE CASCADE
+                    );
+                '''
+                cursor.execute(sql_investment)
 
                 conn.commit()
         except Exception as e:
@@ -297,18 +325,24 @@ class DataRepository:
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO expense (
-                        exp_date, exp_value, exp_description,
-                        exp_type_id, exp_pay_id,
-                        exp_number_of_installments, exp_installment_value
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?);
+                        exp_date, 
+                        exp_value, 
+                        exp_description, 
+                        exp_type_id, 
+                        exp_pay_id, 
+                        exp_number_of_installments, 
+                        exp_final_date_of_installment,
+                        exp_value_total_installment
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
                 ''', (
-                    expense.exp_date.strftime("%Y-%m-%d"),
-                    float(expense.exp_value),
-                    str(expense.exp_description),
-                    int(expense.exp_type_id),
-                    int(expense.exp_pay_id),
-                    int(expense.exp_number_of_installments),
-                    float(expense.exp_installment_value)
+                        expense.exp_date,
+                        float(expense.exp_value),
+                        str(expense.exp_description),
+                        int(expense.exp_type_id),
+                        int(expense.exp_pay_id),
+                        int(expense.exp_number_of_installments),
+                        expense.exp_final_date_of_installment,
+                        float(expense.exp_value_total_installments)
                 ))
                 conn.commit()
             return True
@@ -321,21 +355,27 @@ class DataRepository:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
                 cursor.execute('''
-                UPDATE expense
-                SET exp_date = ?, exp_value = ?, exp_description = ?, 
-                    exp_type_id = ?, exp_pay_id = ?, 
-                    exp_number_of_installments = ?, exp_installment_value = ?
-                WHERE exp_id = ?;
-            ''', (
-                str(expense.exp_date),                      # exp_date
-                float(expense.exp_value),                   # exp_value
-                str(expense.exp_description),               # exp_description
-                int(expense.exp_type_id),                   # exp_type_id
-                int(expense.exp_pay_id),                    # exp_pay_id
-                int(expense.exp_number_of_installments),    # exp_number_of_installments
-                float(expense.exp_installment_value),       # exp_installment_value
-                int(expense.exp_id)                         # exp_id
-            ))
+                    UPDATE expense 
+                    SET exp_date = ?, 
+                        exp_value = ?, 
+                        exp_description = ?, 
+                        exp_type_id = ?, 
+                        exp_pay_id = ?, 
+                        exp_number_of_installments = ?, 
+                        exp_final_date_of_installment = ?, 
+                        exp_value_total_installment = ?
+                    WHERE exp_id = ?;
+                ''',(
+                        expense.exp_date,
+                        float(expense.exp_value),
+                        str(expense.exp_description),
+                        int(expense.exp_type_id),
+                        int(expense.exp_pay_id),
+                        int(expense.exp_number_of_installments),
+                        expense.exp_final_date_of_installment,
+                        float(expense.exp_value_total_installments),
+                        int(expense.exp_id)
+                ))
                 conn.commit()
             return True
         except Exception as e:
