@@ -495,7 +495,7 @@ def view_expense():
                 column_config={
                     "exp_id": None,
                     "Data": st.column_config.DateColumn("Data", format="DD/MM/YYYY"),
-                    "Última parcela": st.column_config.DateColumn("Última parcela", format="DD/MM/YYYY"),
+                    "Última parcela": st.column_config.DateColumn("Última parcela", format="MM/YYYY"),
                     "Valor": st.column_config.TextColumn("Valor"),
                     "Valor total": st.column_config.TextColumn("Valor total"),
                     "Quantidade de parcelas": st.column_config.TextColumn("Quantidade de parcelas")

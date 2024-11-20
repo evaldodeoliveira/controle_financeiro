@@ -1,6 +1,8 @@
 import pandas as pd
 import sqlite3
 import streamlit as st
+import random
+from datetime import datetime, timedelta
 
 from models.expense import Expense
 
@@ -59,7 +61,6 @@ class DataRepository:
                         exp_number_of_installments INTEGER DEFAULT 0,
                         exp_final_date_of_installment DATE, -- Data final do parcelamento
                         exp_value_total_installment REAL NOT NULL,  -- Usando REAL para armazenar valores monetários
-                        exp_is_installment BOOLEAN DEFAULT 0,  -- Booleano indicando se é parcelado (1) ou à vista (0)
                         FOREIGN KEY (exp_type_id) REFERENCES type(type_id) ON DELETE CASCADE,
                         FOREIGN KEY (exp_pay_id) REFERENCES payment(pay_id) ON DELETE CASCADE
                     );
@@ -393,3 +394,96 @@ class DataRepository:
         except Exception as e:
             st.error(f"Ocorreu um erro ao deletar: {e}")
             return False
+        
+
+    # Função para popular o banco de dados com registros fictícios
+def populate_database():
+    try:
+        with sqlite3.connect('./data/financial_control.db') as conn:
+            cursor = conn.cursor()
+
+            # Inserir categorias
+            categories = [
+                ('expense', 'Alimentação', 'Despesas com alimentação e restaurantes'),
+                ('expense', 'Transporte', 'Despesas com transporte público ou combustível'),
+                ('income', 'Salário', 'Rendimentos mensais do trabalho'),
+                ('income', 'Freelance', 'Rendimentos de trabalhos autônomos'),
+                ('investment', 'Ações', 'Investimento em mercado de ações'),
+                ('investment', 'Renda Fixa', 'Investimento em títulos de renda fixa')
+            ]
+            cursor.executemany("INSERT OR IGNORE INTO category (cat_type, cat_name, cat_description) VALUES (?, ?, ?)", categories)
+
+            # Inserir tipos
+            types = [
+                ('expense', 'Supermercado', 'Gastos com compras de supermercado', 1),
+                ('expense', 'Posto de Gasolina', 'Gastos com combustível', 2),
+                ('income', 'Bônus', 'Recebimentos extras além do salário', 3),
+                ('investment', 'Tesouro Direto', 'Investimentos no Tesouro Nacional', 6)
+            ]
+            cursor.executemany("INSERT OR IGNORE INTO type (type_type, type_name, type_description, type_category_id) VALUES (?, ?, ?, ?)", types)
+
+            # Inserir meios de pagamento
+            payments = [
+                ('Cartão de Crédito', 'Pagamentos feitos com cartão de crédito'),
+                ('Cartão de Débito', 'Pagamentos feitos com cartão de débito'),
+                ('Dinheiro', 'Pagamentos realizados em dinheiro'),
+                ('Transferência Bancária', 'Pagamentos realizados por transferência')
+            ]
+            cursor.executemany("INSERT OR IGNORE INTO payment (pay_name, pay_description) VALUES (?, ?)", payments)
+
+            # Inserir despesas
+            for _ in range(200):
+                exp_date = datetime.now() - timedelta(days=random.randint(0, 365))
+                exp_value = round(random.uniform(20, 500), 2)
+                exp_description = random.choice(['Supermercado', 'Gasolina', 'Restaurante', 'Transporte'])
+                exp_type_id = random.randint(1, 2)
+                exp_pay_id = random.randint(1, 4)
+                exp_number_of_installments = random.choice([0, 3, 6, 12])
+                exp_final_date_of_installment = (exp_date + timedelta(days=30 * exp_number_of_installments)).date()
+                exp_value_total_installment = exp_value * (exp_number_of_installments if exp_number_of_installments else 1)
+
+                cursor.execute(
+                    "INSERT INTO expense (exp_date, exp_value, exp_description, exp_type_id, exp_pay_id, "
+                    "exp_number_of_installments, exp_final_date_of_installment, exp_value_total_installment) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (exp_date.date(), exp_value, exp_description, exp_type_id, exp_pay_id,
+                    exp_number_of_installments, exp_final_date_of_installment, exp_value_total_installment)
+                )
+
+            # Inserir receitas
+            for _ in range(100):
+                inc_date = datetime.now() - timedelta(days=random.randint(0, 365))
+                inc_value = round(random.uniform(1000, 5000), 2)
+                inc_description = random.choice(['Salário Mensal', 'Pagamento de Projeto'])
+                inc_type_id = random.randint(3, 4)
+
+                cursor.execute(
+                    "INSERT INTO income (inc_date, inc_value, inc_description, inc_type_id) "
+                    "VALUES (?, ?, ?, ?)",
+                    (inc_date.date(), inc_value, inc_description, inc_type_id)
+                )
+
+            # Inserir investimentos
+            for _ in range(50):
+                inv_date = datetime.now() - timedelta(days=random.randint(0, 365))
+                inv_value = round(random.uniform(1000, 20000), 2)
+                inv_description = random.choice(['Compra de Ações', 'Aplicação em Renda Fixa'])
+                inv_type_id = random.randint(5, 6)
+                inv_return_rate = round(random.uniform(0.02, 0.12), 4)
+                inv_maturity_date = inv_date + timedelta(days=random.randint(30, 365))
+
+                cursor.execute(
+                    "INSERT INTO investment (inv_date, inv_value, inv_description, inv_type_id, inv_return_rate, inv_maturity_date) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (inv_date.date(), inv_value, inv_description, inv_type_id, inv_return_rate, inv_maturity_date.date())
+                )
+
+            conn.commit()
+    except Exception as e:
+        return str(e)
+    return "Database populated successfully."
+
+# Inicializar e popular o banco de dados
+#initialize_result = initialize_database()
+populate_result = populate_database()
+populate_result
