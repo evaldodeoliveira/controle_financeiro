@@ -1,9 +1,3 @@
-# class Category:
-#     def __init__(self, id: int, name: str, description: str):
-#         self.id = id
-#         self.name = name
-#         self.description = description
-
 class Category:
     def __init__(self, cat_id: int, cat_type: str, cat_name: str, cat_description: str):
         self.cat_id = cat_id

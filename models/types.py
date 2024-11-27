@@ -1,9 +1,3 @@
-# class Type:
-#     def __init__(self, id: int, name: str, description: str):
-#         self.id = id
-#         self.name = name
-#         self.description = description
-
 class Type:
     def __init__(self, type_id: int, type_type: str, type_name: str, type_description: str, type_category_id: int):
         self.type_id = type_id

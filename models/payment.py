@@ -1,9 +1,3 @@
-# class Payment:
-#     def __init__(self, id: int, name: str, description: str):
-#         self.id = id
-#         self.name = name
-#         self.description = description
-
 class Payment:
     def __init__(self, pay_id: int, pay_name: str, pay_description: str):
         self.pay_id = pay_id

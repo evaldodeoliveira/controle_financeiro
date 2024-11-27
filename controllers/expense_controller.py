@@ -1,10 +1,12 @@
-from repositories.data_repository import DataRepository
+#from repositories.data_repository import DataRepository
+from repositories.expense_repository import ExpenseRepository
 from models.expense import Expense
 
 
 class ExpenseController:
     def __init__(self):
-        self.repo = DataRepository()
+        #self.repo = DataRepository()
+        self.repo = ExpenseRepository()
 
     def get_expenses(self):
         return self.repo.load_expenses()

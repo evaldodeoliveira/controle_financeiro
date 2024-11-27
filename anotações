@@ -1,7 +1,25 @@
+implementar no categoria                    
+st.cache_data.clear()  # Limpa todos os caches   
+st.cache_resource()  
 
-ajustar valor mostrdao dentro das barras eliminando o "k"
+demais gráficos
+# 4. Comparação entre Despesas Fixas e Variáveis
+# 2. Gráfico de Despesas por Tipo (Saude. trasnporte...)
 
-autenticação de login
+passar data inicio e data fi get_all expense
+paginação dataframe tela de despesa
+otimizar/esta pesado a tratativa de apresentação dos dados nos gráficos
+
+autenticação de login - ok
+dotenv
+requirements.txt
+gitingore
+auth_controleer.py
+#mudar chave para dotenve
+#SECRET_KEY = "sua_chave_secreta"
+
+yeld para buscar dados do banco e otimizar memória (curso de login asimov "instanciando conexão com postgres")
+
 
 qunato tenho que pagar de catrão no próximo mẽs? deste valor descriminar em categoia, tipo
 quanto já paguei no mês? deste valor descriminar em categoia, tipo, tipo de pagamento

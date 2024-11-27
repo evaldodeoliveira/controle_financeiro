@@ -1,8 +1,10 @@
-from repositories.data_repository import DataRepository
+#from repositories.data_repository import DataRepository
+from repositories.payment_repository import PaymentRepository
 
 class PaymentController:
     def __init__(self):
-        self.repo = DataRepository()
+        #self.repo = DataRepository()
+        self.repo = PaymentRepository()
 
     def get_payments(self):
         return self.repo.load_payments()

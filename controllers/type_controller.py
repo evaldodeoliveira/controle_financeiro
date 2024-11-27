@@ -1,8 +1,10 @@
-from repositories.data_repository import DataRepository
+#from repositories.data_repository import DataRepository
+from repositories.type_repository import TypeRepository
 
 class TypeController:
     def __init__(self):
-        self.repo = DataRepository()
+        #self.repo = DataRepository()
+        self.repo = TypeRepository()
 
     def get_types(self):
         return self.repo.load_types()
