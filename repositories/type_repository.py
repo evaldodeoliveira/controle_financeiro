@@ -1,4 +1,4 @@
-from data.database import get_connection
+from repositories.database_repository import DataManager
 import pandas as pd
 import streamlit as st
 
@@ -6,7 +6,7 @@ class TypeRepository:
     @staticmethod
     def load_types():
         try:
-            conn = get_connection()
+            conn = DataManager.get_connection()
             
             query = """
                 SELECT * FROM type t
@@ -24,7 +24,7 @@ class TypeRepository:
     @staticmethod
     def save_type(type_type, type_name, type_description, type_category_id):
         try:
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -52,7 +52,7 @@ class TypeRepository:
             type_id = int(type_id)
             type_category_id = int(type_category_id)
             
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
             
             cursor.execute(
@@ -80,7 +80,7 @@ class TypeRepository:
         try:
             type_id = int(type_id)
 
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
 
             cursor.execute("PRAGMA foreign_keys = ON;")

@@ -1,5 +1,6 @@
 import streamlit as st
-from controllers.auth_middleware import is_authenticated
+from controllers.auth_manager import is_authenticated, show_login
+#from controllers.auth_middleware import is_authenticated
 import numpy as np
 from controllers.type_controller import TypeController
 from controllers.category_controller import CategoryController
@@ -14,10 +15,13 @@ st.set_page_config(
     }
 )
 
-st.sidebar.markdown("Desenvolvido por [Evaldo](https://www.linkedin.com/in/evaldodeoliveira/)")
 
-def type_page():
-    is_authenticated()  # Verifica se o usuário está autenticado
+def main():
+    #is_authenticated()  # Verifica se o usuário está autenticado
+    if not is_authenticated():
+        show_login()
+        return  # Impede que o restante da página seja carregado
+    st.sidebar.button("Sair", on_click=lambda: st.session_state.pop('auth_token', None), use_container_width=True, type="primary")
 
     def menu(config):
             col1, col2, col3, col4 = st.columns(4)
@@ -84,7 +88,9 @@ def type_page():
                     # types_updated = config['type'] + '_types_updated'
                     # st.session_state[types_updated] = True
                     # types_in_memorie = config['type'] + '_types_in_memorie'
-                    # st.session_state[types_in_memorie] = True                               
+                    # st.session_state[types_in_memorie] = True
+                    st.cache_data.clear()  # Limpa todos os caches   
+                    st.cache_resource()                                  
                     st.rerun()                
             else:
                 st.warning('Campo "Nome" obrigatório!')
@@ -192,7 +198,9 @@ def type_page():
                     # types_updated = config['type'] + '_types_updated'
                     # st.session_state[types_updated] = True
                     # types_in_memorie = config['type'] + '_types_in_memorie'
-                    # st.session_state[types_in_memorie] = True        
+                    # st.session_state[types_in_memorie] = True
+                    st.cache_data.clear()  # Limpa todos os caches   
+                    st.cache_resource()           
                     st.rerun()  # Recarrega a página para refletir as mudanças
 
     @st.dialog("Excluir tipo")
@@ -255,7 +263,9 @@ def type_page():
                         # st.session_state[types_in_memorie] = True    
 
                         # type_deleted = config['type'] + '_type_deleted' #Usado onde?
-                        # st.session_state[type_deleted] = True       
+                        # st.session_state[type_deleted] = True     
+                        st.cache_data.clear()  # Limpa todos os caches   
+                        st.cache_resource()     
                         st.rerun()  # Recarrega a página para refletir as mudanças 
             
             with col2:
@@ -518,9 +528,11 @@ def type_page():
 
     type_view()
 
-    if 'auth_token' not in st.session_state:
-        st.rerun()  # Redireciona para a página principal
+    # if 'auth_token' not in st.session_state:
+    #     st.rerun()  # Redireciona para a página principal
 
 
 if __name__ == "__main__":
-    type_page()
+    main()
+
+st.sidebar.markdown("Desenvolvido por [Evaldo](https://www.linkedin.com/in/evaldodeoliveira/)")

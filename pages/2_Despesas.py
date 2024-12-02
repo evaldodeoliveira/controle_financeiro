@@ -1,5 +1,6 @@
 import streamlit as st
-from controllers.auth_middleware import is_authenticated
+from controllers.auth_manager import is_authenticated, show_login
+#from controllers.auth_middleware import is_authenticated
 from controllers.category_controller import CategoryController
 from controllers.type_controller import TypeController
 from controllers.expense_controller import ExpenseController
@@ -19,12 +20,14 @@ st.set_page_config(
     }
 )
 
-st.sidebar.markdown("Desenvolvido por [Evaldo](https://www.linkedin.com/in/evaldodeoliveira/)")
 
+def main():
+    #is_authenticated()  # Verifica se o usuário está autenticado
+    if not is_authenticated():
+        show_login()
+        return  # Impede que o restante da página seja carregado
+    st.sidebar.button("Sair", on_click=lambda: st.session_state.pop('auth_token', None), use_container_width=True, type="primary")
 
-def expense_page():
-    is_authenticated()  # Verifica se o usuário está autenticado
-    
 
     def format_to_float(br_value):
         """
@@ -262,9 +265,9 @@ def expense_page():
                         exp_value_total_installments=exp_value_total_installments
                     )
                     if config['controller'].update_expense(objExpense):
+                        st.session_state.update({'expense_updated': True, 'expense_in_memorie': True})
                         st.cache_data.clear()  # Limpa todos os caches   
-                        st.cache_resource()  
-                        st.session_state.update({'expense_updated': True, 'expense_in_memorie': True})                               
+                        st.cache_resource()                                 
                         st.rerun()                
                 else:
                     st.warning('Campo "Descrição" obrigatório!')
@@ -285,9 +288,9 @@ def expense_page():
                         exp_description=str(description)
                     )
                     if config['controller'].update_expense(objExpense):
+                        st.session_state.update({'expense_updated': True, 'expense_in_memorie': True}) 
                         st.cache_data.clear()  # Limpa todos os caches   
-                        st.cache_resource()  
-                        st.session_state.update({'expense_updated': True, 'expense_in_memorie': True})                               
+                        st.cache_resource()                                
                         st.rerun()                
                 else:
                     st.warning('Campo "Descrição" obrigatório!')
@@ -358,10 +361,11 @@ def expense_page():
                     st.session_state.confirm_delete_expense = False  # Resetar o estado de confirmação
                     result = config['controller'].delete_expense(expense_data['exp_id'])            
                     if result:
+                        st.session_state.update({'expense_updated': True, 'expense_in_memorie': True})
                         st.cache_data.clear()  # Limpa todos os caches   
                         st.cache_resource()                         
-                        st.session_state['expense_updated'] = True
-                        st.session_state['expense_in_memorie'] = True        
+                        #st.session_state['expense_updated'] = True
+                        #st.session_state['expense_in_memorie'] = True        
                         st.rerun()
             
             with col2:
@@ -534,9 +538,11 @@ def expense_page():
 
     view_expense()
 
-    if 'auth_token' not in st.session_state:
-        st.rerun()  # Redireciona para a página principal
+    # if 'auth_token' not in st.session_state:
+    #     st.rerun()  # Redireciona para a página principal
 
 
 if __name__ == "__main__":
-    expense_page()
+    main()
+
+st.sidebar.markdown("Desenvolvido por [Evaldo](https://www.linkedin.com/in/evaldodeoliveira/)")

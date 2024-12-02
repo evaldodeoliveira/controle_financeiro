@@ -18,7 +18,8 @@ class AuthController:
     def create_jwt(user_id):
         payload = {
             "user_id": user_id,
-            "exp": datetime.now(timezone.utc) + timedelta(hours=1)  # Expira em 1 hora
+            #"exp": datetime.now(timezone.utc) + timedelta(hours=1)  # Expira em 1 hora
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=5)  # Expira em 1 minuto
         }
         return jwt.encode(payload, SECRET_KEY, algorithm="HS256")
 

@@ -1,4 +1,4 @@
-from data.database import get_connection
+from repositories.database_repository import DataManager
 from models.expense import Expense
 import pandas as pd
 import streamlit as st
@@ -7,7 +7,7 @@ class ExpenseRepository:
     @staticmethod
     def load_expenses():
         try:
-            conn = get_connection()
+            conn = DataManager.get_connection()
             
             query = """
                 SELECT * FROM expense e
@@ -27,7 +27,7 @@ class ExpenseRepository:
     @staticmethod
     def save_expense(expense: Expense):
         try:
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
             
             cursor.execute(
@@ -66,7 +66,7 @@ class ExpenseRepository:
     @staticmethod
     def update_expense(expense: Expense):
         try:
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
             
             cursor.execute(
@@ -108,7 +108,7 @@ class ExpenseRepository:
         try:
             exp_id = int(exp_id)
 
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
 
             cursor.execute("PRAGMA foreign_keys = ON;")

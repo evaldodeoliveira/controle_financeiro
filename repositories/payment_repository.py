@@ -1,4 +1,4 @@
-from data.database import get_connection
+from repositories.database_repository import DataManager
 import pandas as pd
 import streamlit as st
 
@@ -8,7 +8,7 @@ class PaymentRepository:
         """Carrega os pagamentos do banco de dados como DataFrame."""
         try:
             # Obter conexão do banco de dados
-            conn = get_connection()
+            conn = DataManager.get_connection()
             
             # Executar a consulta SQL
             query = "SELECT * FROM payment;"
@@ -28,7 +28,7 @@ class PaymentRepository:
         """Adiciona um novo pagamento ao banco de dados."""
         try:
             # Obter conexão com o banco de dados
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
             
             # Executar a inserção
@@ -65,7 +65,7 @@ class PaymentRepository:
             pay_id = int(pay_id)
             
             # Obter conexão com o banco de dados
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
             
             # Executar a atualização
@@ -103,7 +103,7 @@ class PaymentRepository:
             pay_id = int(pay_id)
 
             # Obter conexão com o banco de dados
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
 
             # Habilitar chaves estrangeiras, se necessário

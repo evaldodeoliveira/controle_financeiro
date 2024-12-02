@@ -1,10 +1,10 @@
-from data.database import get_connection
+from repositories.database_repository import DataManager
 from models.user import User
 
 class UserRepository:
     @staticmethod
     def create_user(username, password):
-        conn = get_connection()
+        conn = DataManager.get_connection()
         cursor = conn.cursor()
         
         password_hash = User.hash_password(password)
@@ -18,7 +18,7 @@ class UserRepository:
 
     @staticmethod
     def get_user_by_username(username):
-        conn = get_connection()
+        conn = DataManager.get_connection()
         cursor = conn.cursor()
         
         cursor.execute('SELECT * FROM user WHERE user_username = ?', (username,))

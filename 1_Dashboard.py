@@ -1,5 +1,6 @@
 import streamlit as st
-from controllers.auth_controller import AuthController
+from controllers.auth_manager import is_authenticated, show_login
+#from controllers.auth_controller import AuthController
 import pandas as pd
 import plotly.express as px
 from datetime import date, timedelta, datetime
@@ -7,8 +8,9 @@ from controllers.expense_controller import ExpenseController
 from controllers.category_controller import CategoryController
 import locale
 import warnings
+from repositories.database_repository import DataManager
 
-from repositories.user_repository import UserRepository
+#from repositories.user_repository import UserRepository
 
 # import plotly.io as pio
 
@@ -22,8 +24,6 @@ st.set_page_config(
     }
 )
 
-st.sidebar.markdown("Desenvolvido por [Evaldo](https://www.linkedin.com/in/evaldodeoliveira/)")
-
 warnings.simplefilter("ignore", category=FutureWarning)
 # Define o locale para português
 # locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')  # Para Linux
@@ -36,597 +36,612 @@ warnings.simplefilter("ignore", category=FutureWarning)
 locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 
 
-def login_page():
-    st.title("Login")
-    username = st.text_input("Usuário")
-    password = st.text_input("Senha", type="password")
-
-    if st.button("Entrar"):
-        token = AuthController.login(username, password)
-        if token:
-            st.session_state['auth_token'] = token
-            st.success("Login realizado com sucesso!")
-            st.rerun()  # Recarrega para ir para a página inicial
-        else:
-            st.error("Usuário ou senha inválidos.")
-def logout():
-    if 'auth_token' in st.session_state:
-        del st.session_state['auth_token']
-    st.rerun()
-
 def main():
     #teste
-    if st.sidebar.button("Inserir Usuário de Teste"):
-        UserRepository.create_user('admin', 'master')
+    # Inicializar banco de dados
+    try:
+        print("Inicializando o banco de dados...")
+        DataManager()
+        print("Banco de dados configurado com sucesso.")
+    except Exception as e:
+        print(f"Erro durante a inicialização do banco de dados: {e}")
+        return
 
-    if 'auth_token' not in st.session_state:
-        # Exibe a página de login se o usuário não estiver autenticado
-        login_page()
-    else:
-        st.sidebar.button("Sair", on_click=logout)  # Adiciona botão de logout na barra lateral
-
-        @st.cache_data
-        def get_expense():
-            # Obtém os dados
-            expense_controller = ExpenseController()
-            expense_df = expense_controller.get_expenses()
-
-            if not isinstance(expense_df, pd.DataFrame):
-                # Se não for um DataFrame, cria um DataFrame vazio
-                expense_df = pd.DataFrame()
-
-            return expense_df
+    if not is_authenticated():
+        show_login()
+        return  # Impede que o restante da página seja carregado
+    st.sidebar.button("Sair", on_click=lambda: st.session_state.pop('auth_token', None), use_container_width=True, type="primary")
 
 
-        @st.cache_data
-        def get_category():
-            category_controller = CategoryController()
-            category_df = category_controller.get_categories()
+    @st.cache_data
+    def get_expense():
+        # Obtém os dados
+        expense_controller = ExpenseController()
+        expense_df = expense_controller.get_expenses()
 
-            if not isinstance(category_df, pd.DataFrame):
-                # Se não for um DataFrame, cria um DataFrame vazio
-                category_df = pd.DataFrame()
+        if not isinstance(expense_df, pd.DataFrame):
+            # Se não for um DataFrame, cria um DataFrame vazio
+            expense_df = pd.DataFrame()
 
-            return category_df
+        return expense_df
 
-        @st.cache_data
-        def get_filtered_data(expense_df, category_df):
-            """
-            Filtra e formata o DataFrame consolidado entre despesas e categorias.
-            """
-            # Combina despesas com categorias
-            merged_df = pd.merge(
-                expense_df, 
-                category_df, 
-                left_on='type_category_id', 
-                right_on='cat_id', 
-                how='left', 
-                suffixes=('', '_category')
+    @st.cache_data
+    def get_category():
+        category_controller = CategoryController()
+        category_df = category_controller.get_categories()
+
+        if not isinstance(category_df, pd.DataFrame):
+            # Se não for um DataFrame, cria um DataFrame vazio
+            category_df = pd.DataFrame()
+
+        return category_df
+
+    @st.cache_data
+    def get_filtered_data(expense_df, category_df):
+        """
+        Filtra e formata o DataFrame consolidado entre despesas e categorias.
+        """
+        # Combina despesas com categorias
+        merged_df = pd.merge(
+            expense_df, 
+            category_df, 
+            left_on='type_category_id', 
+            right_on='cat_id', 
+            how='left', 
+            suffixes=('', '_category')
+        )
+
+        # Seleciona e renomeia colunas
+        merged_df = merged_df[[
+            'exp_date', 'exp_value', 'exp_description', 'exp_number_of_installments', 
+            'exp_final_date_of_installment', 'exp_value_total_installment', 
+            'cat_name', 'type_name', 'pay_name'
+        ]].rename(columns={
+            'exp_date': 'Data', 
+            'exp_value': 'Valor', 
+            'exp_description': 'Descrição Despesa',
+            'exp_number_of_installments': 'Parcelas',
+            'exp_final_date_of_installment': 'Última parcela',
+            'exp_value_total_installment': 'Valor total das parcelas',
+            'cat_name': 'Categoria', 
+            'type_name': 'Tipo',
+            'pay_name': 'Pagamento'
+        })
+
+        # Converte colunas de data
+        merged_df['Data'] = pd.to_datetime(merged_df['Data'])
+        merged_df['Última parcela'] = pd.to_datetime(merged_df['Última parcela'])
+
+        return merged_df
+
+
+    def grafico_teste(df_filtrado):
+        # Adicionando coluna de mês ao DataFrame filtrado com formato de string para o eixo X
+        df_filtrado['Mes'] = df_filtrado['Data'].dt.to_period('M').astype(str)
+
+        # Criando uma nova coluna para identificar as despesas com cartão de crédito, considerando as parcelas
+        df_filtrado['Despesas_Cartao_Credito'] = 0
+        df_filtrado.loc[df_filtrado['Pagamento'] == 'Cartão de Crédito', 'Despesas_Cartao_Credito'] = df_filtrado['Valor'] * df_filtrado['Parcelas']
+
+
+        # Agrupando por 'Mes' e somando os valores
+        despesas_mensal = df_filtrado.groupby('Mes').agg(
+            Despesas_Cartao_Credito=('Despesas_Cartao_Credito', 'sum'),
+            Despesas_Outras=('Valor', 'sum')
+        ).reset_index()
+
+        # Convertendo a coluna 'Mes' de volta para datetime para uma visualização correta no gráfico
+        despesas_mensal['Mes'] = pd.to_datetime(despesas_mensal['Mes'], format='%Y-%m')
+
+        # Gerando o gráfico de barras empilhadas
+        fig_despesas_mensal = px.bar(despesas_mensal, 
+                                    x='Mes', 
+                                    y=['Despesas_Cartao_Credito', 'Despesas_Outras'], 
+                                    title='Distribuição Mensal das Despesas (Cartão de Crédito vs Outras Despesas)',
+                                    labels={'Despesas_Cartao_Credito': 'Despesas com Cartão de Crédito', 'Despesas_Outras': 'Outras Despesas'},
+                                    color_discrete_sequence=['#FFA07A', '#98C9E4'])
+
+        # Adicionando os valores totais no topo das barras empilhadas
+        for i, row in despesas_mensal.iterrows():
+            total = row['Despesas_Cartao_Credito'] + row['Despesas_Outras']
+            fig_despesas_mensal.add_annotation(
+                x=row['Mes'],
+                y=total,
+                text=f'{total:.2f}',  # Exibindo o total com 2 casas decimais
+                showarrow=False,
+                font=dict(size=12, color="white"),
+                align="center",
+                yanchor="bottom"  # Alinhamento vertical correto
             )
 
-            # Seleciona e renomeia colunas
-            merged_df = merged_df[[
-                'exp_date', 'exp_value', 'exp_description', 'exp_number_of_installments', 
-                'exp_final_date_of_installment', 'exp_value_total_installment', 
-                'cat_name', 'type_name', 'pay_name'
-            ]].rename(columns={
-                'exp_date': 'Data', 
-                'exp_value': 'Valor', 
-                'exp_description': 'Descrição Despesa',
-                'exp_number_of_installments': 'Parcelas',
-                'exp_final_date_of_installment': 'Última parcela',
-                'exp_value_total_installment': 'Valor total das parcelas',
-                'cat_name': 'Categoria', 
-                'type_name': 'Tipo',
-                'pay_name': 'Pagamento'
-            })
+        # Formatando o eixo X para exibir apenas o mês e o ano uma vez (exemplo: "Nov 2024")
+        fig_despesas_mensal.update_xaxes(
+            tickformat="%b %Y",  # Formato de exibição do mês e ano
+            dtick="M1"           # Configura a exibição para cada mês (sem duplicações)
+        )
 
-            # Converte colunas de data
-            merged_df['Data'] = pd.to_datetime(merged_df['Data'])
-            merged_df['Última parcela'] = pd.to_datetime(merged_df['Última parcela'])
+        # Exibindo o gráfico
+        st.plotly_chart(fig_despesas_mensal, use_container_width=True, key='teste')
 
-            return merged_df
+    def payment_type_chart(df):
 
+        # Convert 'Date' column to datetime
+        df['Data'] = pd.to_datetime(df['Data'])
+        
+        # Sidebar for time range selection
+        st.sidebar.header("Filtros de tempo")
+        start_date = st.sidebar.date_input("Data Início", df['Data'].min())
+        end_date = st.sidebar.date_input("Data Fim", df['Data'].max())
+        
+        # Filter dataframe by selected time range
+        filtered_df = df[(df['Data'] >= pd.to_datetime(start_date)) & (df['Data'] <= pd.to_datetime(end_date))]
 
+        # Checkbox to show or hide credit payments
+        show_credit = st.checkbox("Pagamentos a prazo", value=True)
+        
+        # Add a column to differentiate between cash and credit
+        filtered_df['Tipo de Pagamento'] = filtered_df['Parcelas'].apply(lambda x: 'Crédito' if x > 0 else 'À Vista')
+        
+        if not show_credit:
+            filtered_df = filtered_df[filtered_df['Tipo de Pagamento'] == 'À Vista']
 
-        def grafico_teste(df_filtrado):
-            # Adicionando coluna de mês ao DataFrame filtrado com formato de string para o eixo X
-            df_filtrado['Mes'] = df_filtrado['Data'].dt.to_period('M').astype(str)
+        # Group data by payment type and date
+        grouped_df = filtered_df.groupby(['Tipo de Pagamento', 'Data']).sum(numeric_only=True).reset_index()
 
-            # Criando uma nova coluna para identificar as despesas com cartão de crédito, considerando as parcelas
-            df_filtrado['Despesas_Cartao_Credito'] = 0
-            df_filtrado.loc[df_filtrado['Pagamento'] == 'Cartão de Crédito', 'Despesas_Cartao_Credito'] = df_filtrado['Valor'] * df_filtrado['Parcelas']
+        # Create stacked bar chart
+        fig = px.bar(
+            grouped_df,
+            x='Data',
+            y='Valor',
+            color='Tipo de Pagamento',
+            title='Despesas por Tipo de Pagamento',
+            labels={'Valor': 'Valor (BRL)', 'Data': 'Mês'},
+            barmode='stack'
+        )
+        
+        
+        # Update X-axis to show months
+        fig.update_xaxes(tickformat="%b %Y")
+        
+        # Update layout to format values in Brazilian style
+        fig.update_yaxes(tickprefix="R$", tickformat=",.")
 
-
-            # Agrupando por 'Mes' e somando os valores
-            despesas_mensal = df_filtrado.groupby('Mes').agg(
-                Despesas_Cartao_Credito=('Despesas_Cartao_Credito', 'sum'),
-                Despesas_Outras=('Valor', 'sum')
-            ).reset_index()
-
-            # Convertendo a coluna 'Mes' de volta para datetime para uma visualização correta no gráfico
-            despesas_mensal['Mes'] = pd.to_datetime(despesas_mensal['Mes'], format='%Y-%m')
-
-            # Gerando o gráfico de barras empilhadas
-            fig_despesas_mensal = px.bar(despesas_mensal, 
-                                        x='Mes', 
-                                        y=['Despesas_Cartao_Credito', 'Despesas_Outras'], 
-                                        title='Distribuição Mensal das Despesas (Cartão de Crédito vs Outras Despesas)',
-                                        labels={'Despesas_Cartao_Credito': 'Despesas com Cartão de Crédito', 'Despesas_Outras': 'Outras Despesas'},
-                                        color_discrete_sequence=['#FFA07A', '#98C9E4'])
-
-            # Adicionando os valores totais no topo das barras empilhadas
-            for i, row in despesas_mensal.iterrows():
-                total = row['Despesas_Cartao_Credito'] + row['Despesas_Outras']
-                fig_despesas_mensal.add_annotation(
-                    x=row['Mes'],
-                    y=total,
-                    text=f'{total:.2f}',  # Exibindo o total com 2 casas decimais
-                    showarrow=False,
-                    font=dict(size=12, color="white"),
-                    align="center",
-                    yanchor="bottom"  # Alinhamento vertical correto
-                )
-
-            # Formatando o eixo X para exibir apenas o mês e o ano uma vez (exemplo: "Nov 2024")
-            fig_despesas_mensal.update_xaxes(
-                tickformat="%b %Y",  # Formato de exibição do mês e ano
-                dtick="M1"           # Configura a exibição para cada mês (sem duplicações)
-            )
-
-            # Exibindo o gráfico
-            st.plotly_chart(fig_despesas_mensal, use_container_width=True, key='teste')
-
-        def payment_type_chart(df):
-
-            # Convert 'Date' column to datetime
-            df['Data'] = pd.to_datetime(df['Data'])
-            
-            # Sidebar for time range selection
-            st.sidebar.header("Filtros de tempo")
-            start_date = st.sidebar.date_input("Data Início", df['Data'].min())
-            end_date = st.sidebar.date_input("Data Fim", df['Data'].max())
-            
-            # Filter dataframe by selected time range
-            filtered_df = df[(df['Data'] >= pd.to_datetime(start_date)) & (df['Data'] <= pd.to_datetime(end_date))]
-
-            # Checkbox to show or hide credit payments
-            show_credit = st.checkbox("Pagamentos a prazo", value=True)
-            
-            # Add a column to differentiate between cash and credit
-            filtered_df['Tipo de Pagamento'] = filtered_df['Parcelas'].apply(lambda x: 'Crédito' if x > 0 else 'À Vista')
-            
-            if not show_credit:
-                filtered_df = filtered_df[filtered_df['Tipo de Pagamento'] == 'À Vista']
-
-            # Group data by payment type and date
-            grouped_df = filtered_df.groupby(['Tipo de Pagamento', 'Data']).sum(numeric_only=True).reset_index()
-
-            # Create stacked bar chart
-            fig = px.bar(
-                grouped_df,
-                x='Data',
-                y='Valor',
-                color='Tipo de Pagamento',
-                title='Despesas por Tipo de Pagamento',
-                labels={'Valor': 'Valor (BRL)', 'Data': 'Mês'},
-                barmode='stack'
-            )
-            
-            
-            # Update X-axis to show months
-            fig.update_xaxes(tickformat="%b %Y")
-            
-            # Update layout to format values in Brazilian style
-            fig.update_yaxes(tickprefix="R$", tickformat=",.")
-
-            # Formatando o eixo X para exibir apenas o mês e o ano uma vez (exemplo: "Nov 2024")
-            fig.update_xaxes(
-                tickformat="%b %Y",  # Formato de exibição do mês e ano
-                dtick="M1"           # Configura a exibição para cada mês (sem duplicações)
-            )
-            
-            # Display chart
-            st.plotly_chart(fig, use_container_width=True)
+        # Formatando o eixo X para exibir apenas o mês e o ano uma vez (exemplo: "Nov 2024")
+        fig.update_xaxes(
+            tickformat="%b %Y",  # Formato de exibição do mês e ano
+            dtick="M1"           # Configura a exibição para cada mês (sem duplicações)
+        )
+        
+        # Display chart
+        st.plotly_chart(fig, use_container_width=True)
 
 
 
-        #@st.cache_data
-        def generate_stacked_bar_chart(df):
-            """
-            Gera um gráfico de barras empilhadas com valores totais no topo,
-            utilizando a coluna 'Última parcela' e assumindo que 'Valor' já é o valor da parcela.
-            """
-            # Expandir as parcelas usando 'Última parcela'
-            parcelas_expandidas = []
-            for _, row in df.iterrows():
-                if row['Parcelas'] > 0:
-                    data_inicial = row['Data']
-                    data_final = row['Última parcela']
-
-                    # Gerar todas as parcelas com base em 'Data' e 'Última parcela'
-                    parcelas = pd.date_range(start=data_inicial, end=data_final, freq='MS')  # Frequência mensal
-                    for parcela_data in parcelas:
-                        parcelas_expandidas.append({'Mes': parcela_data, 'Tipo': 'Crédito', 'Valor': row['Valor']})
-                else:
-                    # Adicionar despesas à vista (sem expansão)
-                    parcelas_expandidas.append({'Mes': row['Data'], 'Tipo': 'À Vista', 'Valor': row['Valor']})
-            # Criar DataFrame consolidado
-            df_expansao = pd.DataFrame(parcelas_expandidas)
-            # Garantir que a coluna 'Mes' esteja no formato datetime
-            df_expansao['Mes'] = pd.to_datetime(df_expansao['Mes']).dt.to_period('M').dt.to_timestamp()
-
-            # Agrupar por mês e tipo de pagamento
-            grouped_df = df_expansao.groupby(['Mes', 'Tipo'])['Valor'].sum().reset_index()
-
-            # Criar coluna formatada para valores no tooltip e na barra
-            grouped_df["Mes"] = pd.to_datetime(grouped_df["Mes"], format="%Y-%m")
-            grouped_df["Mes Formatado"] = grouped_df["Mes"].dt.strftime("%b %Y")  # Coluna formatada
-            grouped_df['Valor Formatado'] = grouped_df['Valor'].apply(
-                lambda x: f"R${x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            )
-
-            # Criar o gráfico de barras empilhadas
-            fig = px.bar(
-                grouped_df,
-                x='Mes',
-                y='Valor',
-                color='Tipo',
-                title='Despesas Totais por Mês (À Vista + Crédito)',
-                color_discrete_map={'À Vista': 'blue', 'Crédito': 'orange'},
-                text=grouped_df['Valor Formatado'],  # Exibe os valores formatados dentro das barras
-                hover_data={'Tipo': True, 'Valor Formatado': True, 'Mes Formatado': True}  # Exibe valores formatados no tooltip
-            )
-
-            # Estilizar o gráfico
-            fig.update_traces(
-                hovertemplate=('<b>Tipo:</b> %{customdata[0]}<br>'
-                            '<b>Valor:</b> %{customdata[1]}<br>'
-                            '<b>Mês:</b> %{customdata[2]} <extra></extra>'
-                            )
-            )
-
-            # Calcular a altura máxima para posicionar os totais
-            total_df = grouped_df.groupby('Mes')['Valor'].sum().reset_index()
-            for _, row in total_df.iterrows():
-                total_text = f"Total: R${row['Valor']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-                fig.add_annotation(
-                    x=row['Mes'],
-                    y=row['Valor'] + 50,  # Ajustar buffer conforme necessário
-                    text=total_text,
-                    showarrow=False,
-                    align="center",
-                    yanchor="bottom",
-                )
-
-            # Personalizar layout
-            fig.update_layout(
-                xaxis_title='Mês',
-                yaxis=dict(
-                    tickprefix='R$',  # Prefixo para valores no eixo Y
-                    title='Valor (R$)',
-                ),
-                xaxis_tickformat="%b %Y",  # Exibe o mês abreviado e o ano
-                xaxis=dict(
-                    tickmode='array',
-                    tickvals=grouped_df['Mes'],
-                    ticktext=grouped_df['Mes'].dt.strftime('%b %Y').str.capitalize(),
-                ),
-            )
-
-            return fig
-
-        @st.cache_data
-        def chart_installment_evolution(df_filtrado):
-            """
-            Gera um gráfico de linha mostrando a evolução das parcelas por mês,
-            formatando os valores monetários e a data no padrão brasileiro.
-            """
-
-            # Garantir que 'Parcelas' seja numérico
-            df_filtrado['Parcelas'] = pd.to_numeric(df_filtrado['Parcelas'], errors='coerce').fillna(0).astype(int)
-            df_credito = df_filtrado[df_filtrado['Parcelas'] > 0]
-
-            # Expandir as parcelas usando a lógica baseada nas colunas existentes
-            parcelas_expandidas = []
-            for _, row in df_credito.iterrows():
+    @st.cache_data
+    def generate_stacked_bar_chart(df):
+        """
+        Gera um gráfico de barras empilhadas com valores totais no topo,
+        utilizando a coluna 'Última parcela' e assumindo que 'Valor' já é o valor da parcela.
+        """
+        # Expandir as parcelas usando 'Última parcela'
+        parcelas_expandidas = []
+        for _, row in df.iterrows():
+            if row['Parcelas'] > 0:
                 data_inicial = row['Data']
-                data_final = row['Última parcela']  # Usa a última parcela para determinar o período
-                parcelas = pd.date_range(start=data_inicial, end=data_final, freq='MS')  # Gera parcelas mensais
-                
+                data_final = row['Última parcela']
+
+                # Gerar todas as parcelas com base em 'Data' e 'Última parcela'
+                parcelas = pd.date_range(start=data_inicial, end=data_final, freq='MS')  # Frequência mensal
                 for parcela_data in parcelas:
-                    parcelas_expandidas.append({'Data Parcela': parcela_data, 'Valor Parcela': row['Valor']})
+                    parcelas_expandidas.append({'Mes': parcela_data, 'Tipo': 'Crédito', 'Valor': row['Valor']})
+            else:
+                # Adicionar despesas à vista (sem expansão)
+                parcelas_expandidas.append({'Mes': row['Data'], 'Tipo': 'À Vista', 'Valor': row['Valor']})
+        # Criar DataFrame consolidado
+        df_expansao = pd.DataFrame(parcelas_expandidas)
+        # Garantir que a coluna 'Mes' esteja no formato datetime
+        df_expansao['Mes'] = pd.to_datetime(df_expansao['Mes']).dt.to_period('M').dt.to_timestamp()
 
-            # Verificar se existem parcelas
-            if not parcelas_expandidas:
-                # Se não houver parcelas, criar um gráfico vazio
-                fig = px.line(
-                    title='Evolução das Parcelas por Mês',
-                    labels={'Data Parcela': 'Mês do Parcelamento', 'Valor Parcela': 'Montante de Parcelas'}
-                )
-                fig.add_annotation(
-                    x=0.5, y=0.5, text="Nenhuma despesa parcelada encontrada.",
-                    showarrow=False, font=dict(size=16, color="red"), align="center"
-                )
-                return fig
+        # Agrupar por mês e tipo de pagamento
+        grouped_df = df_expansao.groupby(['Mes', 'Tipo'])['Valor'].sum().reset_index()
 
-            # Criar o DataFrame consolidado das parcelas
-            df_parcelas = pd.DataFrame(parcelas_expandidas)
+        # Criar coluna formatada para valores no tooltip e na barra
+        grouped_df["Mes"] = pd.to_datetime(grouped_df["Mes"], format="%Y-%m")
+        grouped_df["Mes Formatado"] = grouped_df["Mes"].dt.strftime("%b %Y")  # Coluna formatada
+        grouped_df['Valor Formatado'] = grouped_df['Valor'].apply(
+            lambda x: f"R${x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        )
 
-            # Agrupar os valores por mês
-            montante_mensal = (
-                df_parcelas.groupby(df_parcelas['Data Parcela'].dt.to_period("M"))['Valor Parcela'].sum().reset_index()
+        # Criar o gráfico de barras empilhadas
+        fig = px.bar(
+            grouped_df,
+            x='Mes',
+            y='Valor',
+            color='Tipo',
+            title='Despesas Totais por Mês (À Vista + Crédito)',
+            color_discrete_map={'À Vista': 'blue', 'Crédito': 'orange'},
+            text=grouped_df['Valor Formatado'],  # Exibe os valores formatados dentro das barras
+            hover_data={'Tipo': True, 'Valor Formatado': True, 'Mes Formatado': True}  # Exibe valores formatados no tooltip
+        )
+
+        # Estilizar o gráfico
+        fig.update_traces(
+            hovertemplate=('<b>Tipo:</b> %{customdata[0]}<br>'
+                        '<b>Valor:</b> %{customdata[1]}<br>'
+                        '<b>Mês:</b> %{customdata[2]} <extra></extra>'
+                        )
+        )
+
+        # Calcular a altura máxima para posicionar os totais
+        total_df = grouped_df.groupby('Mes')['Valor'].sum().reset_index()
+        for _, row in total_df.iterrows():
+            total_text = f"Total: R${row['Valor']:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            fig.add_annotation(
+                x=row['Mes'],
+                y=row['Valor'] + 50,  # Ajustar buffer conforme necessário
+                text=total_text,
+                showarrow=False,
+                align="center",
+                yanchor="bottom",
             )
-            montante_mensal['Data Parcela'] = montante_mensal['Data Parcela'].dt.to_timestamp()
 
-            # Adicionar coluna formatada para os tooltips
-            montante_mensal['Valor Formatado'] = montante_mensal['Valor Parcela'].apply(
-                lambda x: f"R${x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-            )
-            montante_mensal['Data Formatada'] = montante_mensal['Data Parcela'].dt.strftime('%b de %Y').str.capitalize()
+        # Personalizar layout
+        fig.update_layout(
+            xaxis_title='Mês',
+            yaxis=dict(
+                tickprefix='R$',  # Prefixo para valores no eixo Y
+                title='Valor (R$)',
+            ),
+            xaxis_tickformat="%b %Y",  # Exibe o mês abreviado e o ano
+            xaxis=dict(
+                tickmode='array',
+                tickvals=grouped_df['Mes'],
+                ticktext=grouped_df['Mes'].dt.strftime('%b %Y').str.capitalize(),
+            ),
+        )
 
-            # Gerar o gráfico de linha
+        return fig
+
+    @st.cache_data
+    def chart_installment_evolution(df_filtrado):
+        """
+        Gera um gráfico de linha mostrando a evolução das parcelas por mês,
+        formatando os valores monetários e a data no padrão brasileiro.
+        """
+
+        # Garantir que 'Parcelas' seja numérico
+        df_filtrado['Parcelas'] = pd.to_numeric(df_filtrado['Parcelas'], errors='coerce').fillna(0).astype(int)
+        df_credito = df_filtrado[df_filtrado['Parcelas'] > 0]
+
+        # Expandir as parcelas usando a lógica baseada nas colunas existentes
+        parcelas_expandidas = []
+        for _, row in df_credito.iterrows():
+            data_inicial = row['Data']
+            data_final = row['Última parcela']  # Usa a última parcela para determinar o período
+            parcelas = pd.date_range(start=data_inicial, end=data_final, freq='MS')  # Gera parcelas mensais
+            
+            for parcela_data in parcelas:
+                parcelas_expandidas.append({'Data Parcela': parcela_data, 'Valor Parcela': row['Valor']})
+
+        # Verificar se existem parcelas
+        if not parcelas_expandidas:
+            # Se não houver parcelas, criar um gráfico vazio
             fig = px.line(
-                montante_mensal,
-                x='Data Parcela',
-                y='Valor Parcela',
                 title='Evolução das Parcelas por Mês',
-                labels={
-                    'Data Parcela': 'Mês do Parcelamento',
-                    'Valor Parcela': 'Montante de Parcelas (R$)'
-                },
-                hover_data={'Valor Parcela': False, 'Valor Formatado': True, 'Data Formatada': True}  # Exibe valores formatados no tooltip
+                labels={'Data Parcela': 'Mês do Parcelamento', 'Valor Parcela': 'Montante de Parcelas'}
             )
-
-            # Estilizar o gráfico
-            fig.update_traces(
-                mode="lines+markers",
-                line=dict(width=2),
-                hovertemplate='<b>Mês:</b> %{customdata[1]}<br><b>Montante:</b> %{customdata[0]}<extra></extra>'
+            fig.add_annotation(
+                x=0.5, y=0.5, text="Nenhuma despesa parcelada encontrada.",
+                showarrow=False, font=dict(size=16, color="red"), align="center"
             )
-            fig.update_layout(
-                yaxis=dict(
-                    tickprefix='R$',  # Prefixo no eixo Y
-                    title='Montante de Parcelas (R$)'
-                ),
-                xaxis_tickformat="%b %Y",  # Exibe o mês abreviado e o ano
-                xaxis=dict(
-                    tickmode='array',
-                    tickvals=montante_mensal['Data Parcela'],
-                    ticktext=montante_mensal['Data Parcela'].dt.strftime('%b %Y').str.capitalize()
-                )
-            )
-
             return fig
 
+        # Criar o DataFrame consolidado das parcelas
+        df_parcelas = pd.DataFrame(parcelas_expandidas)
 
-        # def view_dashboard():   
-        #     controller = ExpenseController()
-        #     expenses_df = controller.get_expenses()
-        #     if expenses_df.empty:
-        #         st.info('''
-        #                     Nenhuma ***despesa*** cadastrada.\n\n
-        #                     Clique no botão abaixo para ser redirecionado a página de ***Despesas***.
-        #                     ''')
-        #         with st.form(key='dash_expense_form', border=False):
-        #             submit_button = st.form_submit_button(label="Ok", use_container_width=True)
-        #             if submit_button:                        
-        #                 st.switch_page("pages/2_Despesas.py")   
-        #             return 
+        # Agrupar os valores por mês
+        montante_mensal = (
+            df_parcelas.groupby(df_parcelas['Data Parcela'].dt.to_period("M"))['Valor Parcela'].sum().reset_index()
+        )
+        montante_mensal['Data Parcela'] = montante_mensal['Data Parcela'].dt.to_timestamp()
 
-        #     controller_cat = CategoryController()
-        #     categories_df = controller_cat.get_categories()
-        #     if categories_df.empty:
-        #         st.info('''
-        #                  Nenhuma ***categoria*** cadastrada.\n\n
-        #                  Clique no botão abaixo para ser redirecionado a página de ***Categorias***.
-        #                  ''')
-        #         with st.form(key='dash_category_form', border=False):
-        #             submit_button = st.form_submit_button(label="Ok", use_container_width=True)
-        #             if submit_button:                        
-        #                 st.switch_page("pages/5_Categorias.py")   
-        #             return 
+        # Adicionar coluna formatada para os tooltips
+        montante_mensal['Valor Formatado'] = montante_mensal['Valor Parcela'].apply(
+            lambda x: f"R${x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        )
+        montante_mensal['Data Formatada'] = montante_mensal['Data Parcela'].dt.strftime('%b de %Y').str.capitalize()
 
-        #     try:
-        #         # Juntando com `df_category` para obter a categoria da despesa
-        #         df_expense_final = pd.merge(
-        #             expenses_df, 
-        #             categories_df, 
-        #             left_on='type_category_id', 
-        #             right_on='cat_id', 
-        #             how='left', 
-        #             suffixes=('', '_category')
-        #         )
-        #         # Selecionando e renomeando colunas relevantes para facilitar o uso
-        #         df_expense_final = df_expense_final[[
-        #             'exp_date', 'exp_value', 'exp_description', 'exp_number_of_installments', 'exp_final_date_of_installment', 'exp_value_total_installment',
-        #             'cat_name',
-        #             'type_name',
-        #             'pay_name'                
-        #         ]].rename(columns={
-        #             'exp_date': 'Data', 
-        #             'exp_value': 'Valor', 
-        #             'exp_description': 'Descrição Despesa',
-        #             'exp_number_of_installments': 'Parcelas',
-        #             'exp_final_date_of_installment': 'Última parcela',
-        #             'exp_value_total_installment': 'Valor total das parcelas',
-        #             'cat_name': 'Categoria', 
-        #             'type_name': 'Tipo',
-        #             'pay_name': 'Pagamento'  
-                
-        #         })
+        # Gerar o gráfico de linha
+        fig = px.line(
+            montante_mensal,
+            x='Data Parcela',
+            y='Valor Parcela',
+            title='Evolução das Parcelas por Mês',
+            labels={
+                'Data Parcela': 'Mês do Parcelamento',
+                'Valor Parcela': 'Montante de Parcelas (R$)'
+            },
+            hover_data={'Valor Parcela': False, 'Valor Formatado': True, 'Data Formatada': True}  # Exibe valores formatados no tooltip
+        )
 
-        #         df_expense_final['Data'] = pd.to_datetime(df_expense_final['Data'])
-        #         df_expense_final['Última parcela'] = pd.to_datetime(df_expense_final['Última parcela'])
-
-        #         # Filtros de Data
-        #         st.title("Dashboard de Despesas")
-        #         #st.sidebar.header("Filtros")
-        #         #data_inicio = st.sidebar.date_input("Data Início", df_expense_final['Data'].min())
-        #         #data_fim = st.sidebar.date_input("Data Fim", df_expense_final['Data'].max())
-
-        #         # Calculando as datas padrão para os últimos 12 meses
-        #         #data_fim_default = df_expense_final['Data'].max()
-        #         #data_fim_default = datetime.now().date()
-        #         data_inicio = datetime.date.today() - datetime.timedelta(days=365)
-        #         data_fim = st.date_input("Data Fim", datetime.date.today(), format="DD/MM/YYYY")
-        #         #print(data_inicio_default, df_expense_final['Data'].min(), df_expense_final['Data'].max())
-        #         #data_inicio = st.date_input("Data Início", data_inicio_default, format="DD/MM/YYYY")
-
-            
-        #         #data_inicio = st.date_input("Data Início", df_expense_final['Data'].min(), format="DD/MM/YYYY")
-        #         #data_fim = st.date_input("Data Fim", df_expense_final['Data'].max(), format="DD/MM/YYYY")
-                
-
-        #         #print(expenses_df['exp_date'].max(),df_expense_final['Data'].min(), df_expense_final['Data'].max(), data_inicio_default)
-        #         # Criando uma cópia do DataFrame filtrado
-        #         df_filtrado = df_expense_final[(df_expense_final['Data'] >= pd.to_datetime(data_inicio)) & 
-        #                                     (df_expense_final['Data'] <= pd.to_datetime(data_fim))].copy()
-
-        #         # Atribuindo a coluna 'Mes' corretamente
-        #         df_filtrado['Mes'] = df_filtrado['Data'].dt.to_period('M')
-
-        #         # Checkbox to show or hide credit payments
-        #         show_credit = st.checkbox("Pagamentos a prazo", value=True)
-
-        #          # Add a column to differentiate between cash and credit
-        #         df_filtrado['Tipo de Pagamento'] = df_filtrado['Parcelas'].apply(lambda x: 'Crédito' if x > 0 else 'À Vista')
-                
-        #         if not show_credit:
-        #             df_filtrado = df_filtrado[df_filtrado['Tipo de Pagamento'] == 'À Vista']
-
-
-
-        #        # payment_type_chart(df_filtrado)
-        #         #teste grafico em function
-        #         #grafico_teste(df_filtrado)
-
-
-        #         stacked_bar_chart = generate_stacked_bar_chart(df_filtrado)
-        #         st.plotly_chart(stacked_bar_chart, use_container_width=True)
-
-        #         installment_evolution = chart_installment_evolution(df_filtrado)
-
-        #         # # Organizando os gráficos em duas colunas
-        #         col1, col2 = st.columns(2)
-
-        #         with col1:
-                    
-        #             st.plotly_chart(installment_evolution, use_container_width=True)
-        #         #     st.plotly_chart(fig_payment_comparison, use_container_width=True)
-        #         #     st.plotly_chart(fig_monthly_distribution, use_container_width=True)
-
-        #         # with col2:
-        #         #     st.plotly_chart(fig_type, use_container_width=True)
-        #         #     st.plotly_chart(fig_installments, use_container_width=True)
-        #         #     st.plotly_chart(fig_fixed_vs_variable, use_container_width=True)
-                
-        #         #  # 1. Gráfico de Despesas por Categoria
-        #         # despesas_categoria = df_filtrado.groupby('Categoria')['Valor'].sum().reset_index()
-        #         # fig_categoria = px.bar(despesas_categoria, x='Categoria', y='Valor', title='Despesas por Categoria', color='Categoria')
-        #         # # Remover rótulos do eixo X
-        #         # fig_categoria.update_layout(
-        #         #     xaxis=dict(showticklabels=False)
-        #         # )
-
-
-
-        #     except Exception as e:
-        #         print(e)
-        def view_dashboard():
-            expense_df = get_expense()
-            if expense_df.empty:
-                st.info('''
-                            Nenhuma ***despesa*** cadastrada.\n\n
-                            Clique no botão abaixo para ser redirecionado a página de ***Despesas***.
-                            ''')
-                with st.form(key='dash_expense_form', border=False):
-                    submit_button = st.form_submit_button(label="Ok", use_container_width=True)
-                    if submit_button:                        
-                        st.switch_page("pages/2_Despesas.py")   
-                    return 
-
-            category_df = get_category()
-            if category_df.empty:
-                st.info('''
-                        Nenhuma ***categoria*** cadastrada.\n\n
-                        Clique no botão abaixo para ser redirecionado a página de ***Categorias***.
-                        ''')
-                with st.form(key='dash_category_form', border=False):
-                    submit_button = st.form_submit_button(label="Ok", use_container_width=True)
-                    if submit_button:                        
-                        st.switch_page("pages/5_Categorias.py")   
-                    return 
-
-            # Filtra os dados
-            df_expense_final = get_filtered_data(expense_df, category_df)
-
-            # Configura os filtros de data
-            st.title("Dashboard de Despesas")
-            data_inicio = st.date_input("Data Início:", date.today() - timedelta(days=365), format="DD/MM/YYYY")
-            data_fim = st.date_input("Data Fim", date.today(), format="DD/MM/YYYY")
-
-            # Filtra despesas por intervalo de datas
-            df_filtrado = df_expense_final[
-                (df_expense_final['Data'] >= pd.to_datetime(data_inicio)) &
-                (df_expense_final['Data'] <= pd.to_datetime(data_fim))
-            ].copy()
-
-            # Adiciona coluna para tipo de pagamento (À vista ou Crédito)
-            df_filtrado['Tipo de Pagamento'] = df_filtrado['Parcelas'].apply(
-                lambda x: 'Crédito' if x > 0 else 'À Vista'
+        # Estilizar o gráfico
+        fig.update_traces(
+            mode="lines+markers",
+            line=dict(width=2),
+            hovertemplate='<b>Mês:</b> %{customdata[1]}<br><b>Montante:</b> %{customdata[0]}<extra></extra>'
+        )
+        fig.update_layout(
+            yaxis=dict(
+                tickprefix='R$',  # Prefixo no eixo Y
+                title='Montante de Parcelas (R$)'
+            ),
+            xaxis_tickformat="%b %Y",  # Exibe o mês abreviado e o ano
+            xaxis=dict(
+                tickmode='array',
+                tickvals=montante_mensal['Data Parcela'],
+                ticktext=montante_mensal['Data Parcela'].dt.strftime('%b %Y').str.capitalize()
             )
+        )
 
-            # Checkbox para filtrar apenas despesas à vista
-            if not st.checkbox("Exibir pagamentos a prazo", value=True):
-                df_filtrado = df_filtrado[df_filtrado['Tipo de Pagamento'] == 'À Vista']
+        return fig
+    
+#Comparação entre Despesas Fixas e Variáveis
+    @st.cache_data
+    def generate_stacked_bar_chart_category(df):
+        """
+        Gera um gráfico de barras empilhadas para custos distintos por categoria, 
+        distinguindo pagamentos à vista e a prazo.
+        """
+        # Transformar as colunas de data no formato datetime
+        df["Data"] = pd.to_datetime(df["Data"])
+        df["Última parcela"] = pd.to_datetime(df["Última parcela"])
 
-            # Gera gráficos
-            stacked_bar_chart = generate_stacked_bar_chart(df_filtrado)
-            installment_evolution_chart = chart_installment_evolution(df_filtrado)
+        # Definir tipo de pagamento: À Vista ou A Prazo
+        df["Tipo de Custo"] = df["Parcelas"].apply(lambda x: "À Vista" if x == 0 else "A Prazo")
 
-            # Exibe os gráficos
-            st.plotly_chart(stacked_bar_chart, use_container_width=True)
+        # Agrupar por Categoria e Tipo de Custo (À Vista / A Prazo)
+        grouped_df = df.groupby(["Categoria", "Tipo de Custo"])["Valor total das parcelas"].sum().reset_index()
 
-            col1, col2 = st.columns(2)
-            with col1:
-                st.plotly_chart(installment_evolution_chart, use_container_width=True)
+        # Criar gráfico de barras empilhadas
+        fig = px.bar(
+            grouped_df,
+            x="Categoria",
+            y="Valor total das parcelas",
+            color="Tipo de Custo",
+            text=grouped_df["Valor total das parcelas"].apply(
+                lambda x: f"R${x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            ),
+            title="Custos Totais por Categoria (À Vista e A Prazo)",
+            labels={
+                "Categoria": "Categoria",
+                "Valor total das parcelas": "Valor Total (R$)",
+                "Tipo de Custo": "Tipo de Custo"
+            },
+            color_discrete_map={"À Vista": "blue", "A Prazo": "orange"},  # Definir cores personalizadas
+        )
 
-        view_dashboard()
+        # Estilizar o gráfico
+        fig.update_traces(textposition="inside", textfont_size=12)
+        fig.update_layout(
+            xaxis_title="Categoria",
+            yaxis_title="Valor Total (R$)",
+            yaxis_tickprefix="R$",  # Adiciona prefixo para valores no eixo Y
+            legend_title="Tipo de Custo",
+            barmode="stack",  # Define o modo de barras empilhadas
+        )
+
+        return fig
+
+
+    @st.cache_data
+    def generate_stacked_bar_chart_with_month(df):
+        """
+        Gera um gráfico de barras empilhadas agrupando por mês e categoria,
+        distinguindo pagamentos à vista e a prazo.
+        """
+        # Transformar as colunas de data no formato datetime
+        df["Data"] = pd.to_datetime(df["Data"])
+        df["Última parcela"] = pd.to_datetime(df["Última parcela"])
+
+        # Criar coluna para o mês da despesa
+        df["Mês"] = df["Data"].dt.to_period("M").dt.to_timestamp()
+
+        # Definir tipo de pagamento: À Vista ou A Prazo
+        df["Tipo de Custo"] = df["Parcelas"].apply(lambda x: "À Vista" if x == 0 else "A Prazo")
+
+        # Expansão das parcelas (para considerar todos os meses até a última parcela)
+        parcelas_expandidas = []
+        for _, row in df.iterrows():
+            if row["Parcelas"] > 0:
+                # Criar todas as parcelas a partir da data inicial até a última parcela
+                parcelas = pd.date_range(start=row["Data"], end=row["Última parcela"], freq="MS")
+                for parcela_data in parcelas:
+                    parcelas_expandidas.append({
+                        "Mês": parcela_data,
+                        "Categoria": row["Categoria"],
+                        "Tipo de Custo": "A Prazo",
+                        "Valor": row["Valor"]
+                    })
+            else:
+                # Adicionar valores à vista (sem expansão)
+                parcelas_expandidas.append({
+                    "Mês": row["Mês"],
+                    "Categoria": row["Categoria"],
+                    "Tipo de Custo": "À Vista",
+                    "Valor": row["Valor"]
+                })
+
+        # Criar um novo DataFrame consolidado
+        df_expansao = pd.DataFrame(parcelas_expandidas)
+
+        # Agrupar por Mês, Categoria e Tipo de Custo
+        grouped_df = (
+            df_expansao.groupby(["Mês", "Categoria", "Tipo de Custo"])["Valor"]
+            .sum()
+            .reset_index()
+        )
+
+        # Criar gráfico de barras empilhadas com Mês e Categoria no eixo X
+        fig = px.bar(
+            grouped_df,
+            x="Mês",
+            y="Valor",
+            color="Tipo de Custo",
+            facet_col="Categoria",
+            text=grouped_df["Valor"].apply(
+                lambda x: f"R${x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            ),
+            title="Custos por Mês e Categoria (À Vista e A Prazo)",
+            labels={
+                "Mês": "Mês",
+                "Valor": "Valor (R$)",
+                "Tipo de Custo": "Tipo de Custo"
+            },
+            color_discrete_map={"À Vista": "blue", "A Prazo": "orange"},
+        )
+
+        # Estilizar o gráfico
+        fig.update_traces(textposition="inside", textfont_size=12)
+        fig.update_layout(
+            xaxis_title="Mês",
+            yaxis_title="Valor Total (R$)",
+            yaxis_tickprefix="R$",  # Prefixo para valores no eixo Y
+            legend_title="Tipo de Custo",
+            barmode="stack",  # Define o modo de barras empilhadas
+        )
+
+        return fig
+
+
+
+    @st.cache_data
+    def generate_pie_chart_by_category(df):
+        """
+        Gera um gráfico de pizza agrupado por categoria, 
+        distinguindo os custos com cores diferentes.
+        """
+        # Transformar as colunas de data no formato datetime
+        df["Data"] = pd.to_datetime(df["Data"])
+        df["Última parcela"] = pd.to_datetime(df["Última parcela"])
+
+        # Calcular o total de despesas por categoria
+        grouped_df = df.groupby("Categoria")["Valor total das parcelas"].sum().reset_index()
+
+        # Adicionar uma coluna com valores formatados para exibição no gráfico
+        grouped_df["Valor Formatado"] = grouped_df["Valor total das parcelas"].apply(
+            lambda x: f"R${x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        )
+
+        # Criar gráfico de pizza
+        fig = px.pie(
+            grouped_df,
+            values="Valor total das parcelas",  # Tamanho dos setores
+            names="Categoria",                 # Categorias como rótulos
+            title="Distribuição de Custos por Categoria",
+            hole=0.3,                          # Gráfico de rosca
+            labels={
+                "Valor total das parcelas": "Valor Total (R$)",
+                "Categoria": "Categoria"
+            },
+            color_discrete_sequence=px.colors.qualitative.Set3  # Paleta de cores para categorias
+        )
+
+        # Estilizar o gráfico
+        fig.update_traces(
+            textinfo="percent+label",  # Exibir rótulos e porcentagem nos setores
+            hovertemplate="<b>%{label}</b><br>Valor Total: %{customdata}<extra></extra>",
+            customdata=grouped_df["Valor Formatado"]  # Adicionar valor formatado no hover
+        )
+
+        fig.update_layout(
+            showlegend=True,
+            legend_title="Categorias",
+        )
+
+        return fig
+
+
+    def view_dashboard():
+        expense_df = get_expense()
+        if expense_df.empty:
+            st.info('''
+                        Nenhuma ***despesa*** cadastrada.\n\n
+                        Clique no botão abaixo para ser redirecionado a página de ***Despesas***.
+                        ''')
+            with st.form(key='dash_expense_form', border=False):
+                submit_button = st.form_submit_button(label="Ok", use_container_width=True)
+                if submit_button:                        
+                    st.switch_page("pages/2_Despesas.py")   
+                return 
+
+        category_df = get_category()
+        if category_df.empty:
+            st.info('''
+                    Nenhuma ***categoria*** cadastrada.\n\n
+                    Clique no botão abaixo para ser redirecionado a página de ***Categorias***.
+                    ''')
+            with st.form(key='dash_category_form', border=False):
+                submit_button = st.form_submit_button(label="Ok", use_container_width=True)
+                if submit_button:                        
+                    st.switch_page("pages/5_Categorias.py")   
+                return 
+
+        # Filtra os dados
+        df_expense_final = get_filtered_data(expense_df, category_df)
+
+        # Configura os filtros de data
+        st.title("Dashboard de Despesas")
+        data_inicio = st.date_input("Data Início:", date.today() - timedelta(days=365), format="DD/MM/YYYY")
+        data_fim = st.date_input("Data Fim", date.today(), format="DD/MM/YYYY")
+
+        # Filtra despesas por intervalo de datas
+        df_filtrado = df_expense_final[
+            (df_expense_final['Data'] >= pd.to_datetime(data_inicio)) &
+            (df_expense_final['Data'] <= pd.to_datetime(data_fim))
+        ].copy()
+
+        # Adiciona coluna para tipo de pagamento (À vista ou Crédito)
+        df_filtrado['Tipo de Pagamento'] = df_filtrado['Parcelas'].apply(
+            lambda x: 'Crédito' if x > 0 else 'À Vista'
+        )
+
+        # Checkbox para filtrar apenas despesas à vista
+        if not st.checkbox("Exibir pagamentos a prazo", value=True):
+            df_filtrado = df_filtrado[df_filtrado['Tipo de Pagamento'] == 'À Vista']
+
+        # Gera gráficos
+        print(df_filtrado)
+        stacked_bar_chart = generate_stacked_bar_chart(df_filtrado)
+        installment_evolution_chart = chart_installment_evolution(df_filtrado)
+        stacked_bar_chart_category = generate_stacked_bar_chart_category(df_filtrado)
+        stacked_bar_chart_with_month = generate_stacked_bar_chart_with_month(df_filtrado)
+        pie_chart_category = generate_pie_chart_by_category(df_filtrado)
+
+        # Exibe os gráficos
+        st.plotly_chart(stacked_bar_chart, use_container_width=True)
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.plotly_chart(installment_evolution_chart, use_container_width=True)
+        with col2:
+            st.plotly_chart(stacked_bar_chart_category, use_container_width=True)
+        
+        st.plotly_chart(stacked_bar_chart_with_month, use_container_width=True)
+        st.plotly_chart(pie_chart_category, use_container_width=True)
+
+
+
+    view_dashboard()
 
 
 if __name__ == "__main__":
     main()
 
-            # # # Dados fictícios para exemplo
-            # # data = {
-            # #     'exp_date': pd.date_range(start='2024-01-01', end='2024-12-31', freq='M'),
-            # #     'exp_value': [300, 450, 200, 600, 700, 800, 150, 500, 400, 650, 720, 330],
-            # #     'exp_category': ['Alimentação', 'Transporte', 'Saúde', 'Educação', 'Lazer', 'Moradia',
-            # #                      'Outros', 'Transporte', 'Saúde', 'Lazer', 'Alimentação', 'Educação'],
-            # #     'exp_type': ['Essencial', 'Essencial', 'Opcional', 'Essencial', 'Opcional', 'Essencial',
-            # #                  'Opcional', 'Essencial', 'Essencial', 'Opcional', 'Opcional', 'Essencial'],
-            # #     'exp_payment_method': ['Cartão de Crédito', 'Pix', 'Dinheiro', 'Cartão de Débito', 'Cartão de Crédito',
-            # #                            'Pix', 'Dinheiro', 'Cartão de Débito', 'Pix', 'Dinheiro', 'Cartão de Crédito', 'Pix'],
-            # #     'exp_installments': [1, 3, 1, 12, 6, 1, 2, 1, 3, 1, 12, 1]
-            # # }
-            # # df = pd.DataFrame(data)
+st.sidebar.markdown("Desenvolvido por [Evaldo](https://www.linkedin.com/in/evaldodeoliveira/)")
 
-            # # # Interface de filtro de datas
-            # # st.title("Dashboard de Despesas")
-            # # st.subheader("Selecione o intervalo de datas para análise")
+         
 
-            # # # Input de data inicial e final
-            # # start_date = st.date_input("Data inicial", value=datetime(2024, 1, 1))
-            # # end_date = st.date_input("Data final", value=datetime(2024, 12, 31))
-
-            # # # Filtrar o DataFrame com base no intervalo de datas selecionado
-            # # filtered_df = df[(df['exp_date'] >= pd.to_datetime(start_date)) & (df['exp_date'] <= pd.to_datetime(end_date))]
-
-            # # # # Gráficos de despesas
-            # # fig_category = px.pie(filtered_df, values='exp_value', names='exp_category', title='Despesas por Categoria')
-            # # fig_type = px.bar(filtered_df, x='exp_type', y='exp_value', title='Despesas por Tipo', color='exp_type')
-
+          
             # # # Gráficos
             # # # 1. Comparativo de Pagamentos (Tipo de Pagamento)
             # # fig_payment_comparison = px.bar(
@@ -683,37 +698,6 @@ if __name__ == "__main__":
 
 
 
-
-            # # Exemplo de DataFrame para ilustrar o código
-            # # data = {
-            # #     'Data': ['2024-11-12', '2024-11-12', '2024-11-12', '2024-11-12', '2024-11-11'],
-            # #     'Valor': [220.49, 11.87, 77.66, 34.45, 13.00],
-            # #     'Categoria': ['Despesas Variáveis', 'Despesas Variáveis', 'Despesas Variáveis', 'Despesas Variáveis', 'Despesas Variáveis'],
-            # #     'Tipo': ['Transporte', 'Alimentação', 'Saúde', 'Alimentação', 'Alimentação'],
-            # #     'Pagamento': ['Cartão de Crédito', 'Cartão de Crédito', 'Cartão de Crédito', 'Cartão de Crédito', 'Cartão de Crédito'],
-            # #     'Parcelas': [3, 0, 2, 0, 1],  # Valores de exemplo para parcelas
-            # #     'Valor Parcela': [73.5, 0.0, 38.83, 0.0, 13.0]
-            # # }
-
-            # # df_expense_final['Data'] = pd.to_datetime(df_expense_final['Data'])
-
-            # # # Filtros de Data
-            # # st.title("Dashboard de Despesas")
-            # # #st.sidebar.header("Filtros")
-            # # #data_inicio = st.sidebar.date_input("Data Início", df_expense_final['Data'].min())
-            # # #data_fim = st.sidebar.date_input("Data Fim", df_expense_final['Data'].max())
-            # # data_inicio = st.date_input("Data Início", df_expense_final['Data'].min(), format="DD/MM/YYYY")
-            # # data_fim = st.date_input("Data Fim", df_expense_final['Data'].max(), format="DD/MM/YYYY")
-
-            # # # Criando uma cópia do DataFrame filtrado
-            # # df_filtrado = df_expense_final[(df_expense_final['Data'] >= pd.to_datetime(data_inicio)) & 
-            # #                             (df_expense_final['Data'] <= pd.to_datetime(data_fim))].copy()
-
-            # # # Atribuindo a coluna 'Mes' corretamente
-            # # df_filtrado['Mes'] = df_filtrado['Data'].dt.to_period('M')
-
-            # # Criação dos gráficos
-            # # fig_category = px.pie(filtered_df, values='exp_value', names='exp_category', title='Despesas por Categoria')
 
             # # # 1. Gráfico de Despesas por Categoria
             # # despesas_categoria = df_filtrado.groupby('Categoria')['Valor'].sum().reset_index()
@@ -828,102 +812,3 @@ if __name__ == "__main__":
             # # # Convertendo o Period para datetime
             # # despesas_mensal['Mes'] = despesas_mensal['Mes'].dt.to_timestamp()
             # # print(despesas_mensal['Mes'].max())
-
-            # # # Adicionando os meses ausentes com valor zero
-            # # #Não funcionou!!!
-
-            # # # Cria uma linha do tempo completa entre o início e o fim do período filtrado
-            # # todos_meses = pd.date_range(start=despesas_mensal['Mes'].min(), end=despesas_mensal['Mes'].max(), freq='MS')
-            # # print(todos_meses)
-            # # despesas_mensal = despesas_mensal.set_index('Mes').reindex(todos_meses, fill_value=0).reset_index()
-            # # print(despesas_mensal)
-            # # despesas_mensal.columns = ['Mes', 'Valor']  # Renomeando as colunas após o reindex
-
-            # # # Criando o gráfico de barras
-            # # fig_despesas_mensal = px.bar(despesas_mensal, x='Mes', y='Valor', title='Distribuição Mensal das Despesas')
-
-
-
-            # # Organização em colunas e exibição dos gráficos
-            # col1, col2 = st.columns(2)
-
-            # with col1:
-            #     st.plotly_chart(fig_tipo, use_container_width=True)
-            #     st.plotly_chart(fig_pagamento, use_container_width=True)
-
-            # with col2:
-            #     st.plotly_chart(fig_categoria, use_container_width=True)
-            #     st.plotly_chart(fig_parcelas, use_container_width=True)
-
-            # # Exibindo o gráfico com uma chave exclusiva
-            # st.plotly_chart(fig_despesas_mensal, use_container_width=True)
-
-
-            # despesas_categoria_tipo = df_filtrado.groupby(['Categoria', 'Tipo'])['Valor'].sum().reset_index()
-            # fig_categoria_tipo = px.bar(despesas_categoria_tipo, 
-            #                             x='Categoria', y='Valor', 
-            #                             color='Tipo', title='Despesas por Categoria e Tipo', 
-            #                             barmode='stack')
-            # st.plotly_chart(fig_categoria_tipo, use_container_width=True)
-
-            # # #####experimentos
-
-            # # # Adicionando coluna de mês ao DataFrame filtrado com formato de string para o eixo X
-            # # df_filtrado['Mes'] = df_filtrado['Data'].dt.to_period('M').astype(str)
-
-            # # # Criando uma nova coluna para identificar as despesas com cartão de crédito, considerando as parcelas
-            # # df_filtrado['Despesas_Cartao_Credito'] = 0
-            # # df_filtrado.loc[df_filtrado['Pagamento'] == 'Cartão de Crédito', 'Despesas_Cartao_Credito'] = df_filtrado['Valor Parcela'] * df_filtrado['Parcelas']
-
-            # # # Agrupando por 'Mes' e somando os valores
-            # # despesas_mensal = df_filtrado.groupby('Mes').agg(
-            # #     Despesas_Cartao_Credito=('Despesas_Cartao_Credito', 'sum'),
-            # #     Despesas_Outras=('Valor', 'sum')
-            # # ).reset_index()
-
-            # # # Convertendo a coluna 'Mes' de volta para datetime para uma visualização correta no gráfico
-            # # despesas_mensal['Mes'] = pd.to_datetime(despesas_mensal['Mes'], format='%Y-%m')
-
-            # # # Gerando o gráfico de barras empilhadas
-            # # fig_despesas_mensal = px.bar(despesas_mensal, 
-            # #                             x='Mes', 
-            # #                             y=['Despesas_Cartao_Credito', 'Despesas_Outras'], 
-            # #                             title='Distribuição Mensal das Despesas (Cartão de Crédito vs Outras Despesas)',
-            # #                             labels={'Despesas_Cartao_Credito': 'Despesas com Cartão de Crédito', 'Despesas_Outras': 'Outras Despesas'},
-            # #                             color_discrete_sequence=['#FFA07A', '#98C9E4'])
-
-            # # # # # Adicionando os valores totais no topo das barras empilhadas
-            # # # for i, row in despesas_mensal.iterrows():
-            # # #     total = row['Despesas_Cartao_Credito'] + row['Despesas_Outras']
-            # # #     print(total)
-            # # #     fig_despesas_mensal.add_annotation(
-            # # #         x=row['Mes'],
-            # # #         y=total,
-            # # #         text=f'{total:.2f}',  # Exibindo o total com 2 casas decimais
-            # # #         showarrow=False,
-            # # #         font=dict(size=12, color="black"),
-            # # #         align="center",
-            # # #         #verticalalignment="bottom"
-            # # #     )
-
-            # # # Adicionando os valores totais no topo das barras empilhadas
-            # # for i, row in despesas_mensal.iterrows():
-            # #     total = row['Despesas_Cartao_Credito'] + row['Despesas_Outras']
-            # #     fig_despesas_mensal.add_annotation(
-            # #         x=row['Mes'],
-            # #         y=total,
-            # #         text=f'{total:.2f}',  # Exibindo o total com 2 casas decimais
-            # #         showarrow=False,
-            # #         font=dict(size=12, color="white"),
-            # #         align="center",
-            # #         yanchor="bottom"  # Alinhamento vertical correto
-            # #     )
-
-            # # # Formatando o eixo X para exibir apenas o mês e o ano uma vez (exemplo: "Nov 2024")
-            # # fig_despesas_mensal.update_xaxes(
-            # #     tickformat="%b %Y",  # Formato de exibição do mês e ano
-            # #     dtick="M1"           # Configura a exibição para cada mês (sem duplicações)
-            # # )
-
-            # # # Exibindo o gráfico
-            # # st.plotly_chart(fig_despesas_mensal, use_container_width=True, key='teste')

@@ -1,5 +1,6 @@
 import streamlit as st
-from controllers.auth_middleware import is_authenticated
+from controllers.auth_manager import is_authenticated, show_login
+#from controllers.auth_middleware import is_authenticated
 import numpy as np
 from controllers.payment_controller import PaymentController
 
@@ -13,11 +14,14 @@ st.set_page_config(
     }
 )
 
-st.sidebar.markdown("Desenvolvido por [Evaldo](https://www.linkedin.com/in/evaldodeoliveira/)")
 
+def main():
+    #is_authenticated()  # Verifica se o usuário está autenticado
+    if not is_authenticated():
+        show_login()
+        return  # Impede que o restante da página seja carregado
+    st.sidebar.button("Sair", on_click=lambda: st.session_state.pop('auth_token', None), use_container_width=True, type="primary")
 
-def payment_page():
-    is_authenticated()  # Verifica se o usuário está autenticado
         
     @st.dialog("Cadastrar pagamento")
     def create(config):
@@ -31,7 +35,9 @@ def payment_page():
                 
                 if result: 
                     st.session_state['payment_updated'] = True
-                    st.session_state['payment_in_memorie'] = True                               
+                    st.session_state['payment_in_memorie'] = True    
+                    st.cache_data.clear()  # Limpa todos os caches   
+                    st.cache_resource()                              
                     st.rerun()                
             else:
                 st.warning('Campo "Nome" obrigatório!')
@@ -89,7 +95,9 @@ def payment_page():
                 if result:
                     st.session_state['expense_payment_updated'] = True #usado tela Despesas
                     st.session_state['payment_updated'] = True
-                    st.session_state['payment_in_memorie'] = True                
+                    st.session_state['payment_in_memorie'] = True  
+                    st.cache_data.clear()  # Limpa todos os caches   
+                    st.cache_resource()                 
                     st.rerun()
 
     @st.dialog("Excluir pagamento")
@@ -136,7 +144,9 @@ def payment_page():
                     if result:
                         st.session_state['expense_payment_deleted'] = True #Page Despesas                        
                         st.session_state['payment_updated'] = True
-                        st.session_state['payment_in_memorie'] = True        
+                        st.session_state['payment_in_memorie'] = True   
+                        st.cache_data.clear()  # Limpa todos os caches   
+                        st.cache_resource()        
                         st.rerun() 
             
             with col2:
@@ -215,9 +225,11 @@ def payment_page():
 
     payment_view()
 
-    if 'auth_token' not in st.session_state:
-        st.rerun()  # Redireciona para a página principal
+    # if 'auth_token' not in st.session_state:
+    #     st.rerun()  # Redireciona para a página principal
 
 
 if __name__ == "__main__":
-    payment_page()
+    main()
+
+st.sidebar.markdown("Desenvolvido por [Evaldo](https://www.linkedin.com/in/evaldodeoliveira/)")

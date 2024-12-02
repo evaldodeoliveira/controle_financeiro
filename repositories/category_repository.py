@@ -1,4 +1,4 @@
-from data.database import get_connection
+from repositories.database_repository import DataManager
 import pandas as pd
 import streamlit as st
 
@@ -6,7 +6,7 @@ class CategoryRepository:
     @staticmethod
     def load_categories():
         try:
-            conn = get_connection()
+            conn = DataManager.get_connection()
             
             query = "SELECT * FROM category;"
             payments_df = pd.read_sql_query(query, conn)
@@ -21,7 +21,7 @@ class CategoryRepository:
     @staticmethod
     def save_category(cat_type, cat_name, cat_description):
         try:
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
             
             cursor.execute('''
@@ -48,7 +48,7 @@ class CategoryRepository:
         try:
             category_id = int(category_id)
 
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
             
             cursor.execute(
@@ -76,7 +76,7 @@ class CategoryRepository:
         try:
             category_id = int(category_id)
 
-            conn = get_connection()
+            conn = DataManager.get_connection()
             cursor = conn.cursor()
 
             cursor.execute("PRAGMA foreign_keys = ON;")

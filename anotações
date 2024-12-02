@@ -1,16 +1,15 @@
-implementar no categoria                    
-st.cache_data.clear()  # Limpa todos os caches   
-st.cache_resource()  
+ajustar e padronizar código graficos
+generate_stacked_bar_chart_category
+ajustar valor total, 
 
 demais gráficos
-# 4. Comparação entre Despesas Fixas e Variáveis
+# 4. Comparação entre categorias (Despesas Fixas, Variáveis e essenciasi)
 # 2. Gráfico de Despesas por Tipo (Saude. trasnporte...)
 
 passar data inicio e data fi get_all expense
 paginação dataframe tela de despesa
-otimizar/esta pesado a tratativa de apresentação dos dados nos gráficos
 
-autenticação de login - ok
+
 dotenv
 requirements.txt
 gitingore

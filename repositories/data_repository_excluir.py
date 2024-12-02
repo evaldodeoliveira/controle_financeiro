@@ -1,12 +1,10 @@
-import pandas as pd
+#import pandas as pd
 import sqlite3
 import streamlit as st
 import random
 from datetime import datetime, timedelta
 
-from models.expense import Expense
-
-#dividir em arquivos distintos!? Ex: user_repository.py
+#from models.expense import Expense
 
 class DataRepository:
     def __init__(self, db_path='./data/financial_control.db'):
