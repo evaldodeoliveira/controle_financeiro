@@ -134,7 +134,8 @@ def main():
 
             if st.button("Incluir", use_container_width=True):  
                 if description:
-                    exp_final_date_of_installments = date + timedelta(days=30 * (number_of_installments - 1))
+                    #exp_final_date_of_installments = date + timedelta(days=30 * (number_of_installments - 1))
+                    exp_final_date_of_installments = date + timedelta(days=30 * number_of_installments)
                     exp_value_total_installments = value * number_of_installments
                     objExpense = Expense(
                         exp_type_id=type_id,

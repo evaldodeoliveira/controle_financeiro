@@ -1,10 +1,23 @@
-ajustar e padronizar código graficos
-generate_stacked_bar_chart_category
-ajustar valor total, 
 
-demais gráficos
-# 4. Comparação entre categorias (Despesas Fixas, Variáveis e essenciasi)
-# 2. Gráfico de Despesas por Tipo (Saude. trasnporte...)
+CRIAR TELA DE RECEITAS
+criar sql insert padrão
+inserir despesasa reais
+
+gráfico de despesas por tipo e mês
+- alinhamento das barras em caso de ausencia de categoria
+
+
+
+
+ajustar dialog de alterar despesa para incluir opção de mudar de à vista para crédito
+
+
+
+Colocar no topo da página de dash: saldo, receita e despesas
+
+
+ajustar e padronizar código graficos
+
 
 passar data inicio e data fi get_all expense
 paginação dataframe tela de despesa

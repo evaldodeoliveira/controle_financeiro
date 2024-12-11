@@ -5,7 +5,7 @@ import bcrypt
 
 class DataManager:
     DB_PATH = './data/financial_control.db'
-    def __init__(self, db_path=DB_PATH, populate_if_empty=True, development_mode=True):
+    def __init__(self, db_path=DB_PATH, populate_if_empty=False, development_mode=False):
         """
         Inicializa a conexão com o banco de dados, cria as tabelas e popula se necessário.
 
